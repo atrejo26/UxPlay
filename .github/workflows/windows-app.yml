@@ -2,7 +2,8 @@ name: Windows App
 
 # Builds the ready-to-run Windows version of UxPlay: uxplay.exe with all the
 # DLLs and GStreamer plugins it needs, plus the UxPlay.exe tray app.
-# Download it from the run's "Artifacts" section.
+# Download the installer or the portable folder from the run's "Artifacts"
+# section; tags starting with "v" also publish them as a GitHub Release.
 
 on:
   push:
@@ -104,3 +105,45 @@ jobs:
           name: UxPlay-Windows-portable
           path: windows/out/UxPlay
           if-no-files-found: error
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw "Could not install Inno Setup" }
+          }
+          $version = (Select-String -Path uxplay.cpp -Pattern '#define VERSION "(.+)"').Matches[0].Groups[1].Value
+          & $iscc "/DAppVersion=$version" windows/installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed ($LASTEXITCODE)" }
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: UxPlay-Windows-installer
+          path: windows/out/UxPlay-Setup.exe
+          if-no-files-found: error
+
+  # Pushing a tag such as "v1.74-win1" publishes both downloads on the repository's Releases page.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: windows-app
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download builds
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Package portable zip
+        run: cd dist/UxPlay-Windows-portable && zip -qr ../UxPlay-Windows-portable.zip .
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/UxPlay-Windows-installer/UxPlay-Setup.exe
+            dist/UxPlay-Windows-portable.zip
