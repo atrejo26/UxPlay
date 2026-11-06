@@ -1,0 +1,106 @@
+name: Windows App
+
+# Builds the ready-to-run Windows version of UxPlay: uxplay.exe with all the
+# DLLs and GStreamer plugins it needs, plus the UxPlay.exe tray app.
+# Download it from the run's "Artifacts" section.
+
+on:
+  push:
+    branches: [ master, main, 'feature/**' ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  windows-app:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install MSYS2 and dependencies
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-openssl
+            mingw-w64-ucrt-x86_64-libplist
+            mingw-w64-ucrt-x86_64-gstreamer
+            mingw-w64-ucrt-x86_64-gst-plugins-base
+            mingw-w64-ucrt-x86_64-gst-plugins-good
+            mingw-w64-ucrt-x86_64-gst-plugins-bad
+            mingw-w64-ucrt-x86_64-gst-libav
+            mingw-w64-ucrt-x86_64-ntldd
+
+      - name: Build uxplay.exe
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DNO_X11_DEPS=ON
+          cmake --build build
+
+      - name: Bundle uxplay.exe with its DLLs and plugins
+        run: windows/bundle.sh build windows/out/UxPlay
+
+      - name: Build tray app
+        shell: pwsh
+        run: |
+          dotnet build windows/tray/UxPlayTray.csproj -c Release -o windows/out/tray
+          Copy-Item windows/out/tray/UxPlay.exe, windows/out/tray/UxPlay.exe.config windows/out/UxPlay/
+          Copy-Item windows/README.txt windows/out/UxPlay/
+
+      - name: Check the bundle works on its own
+        shell: pwsh
+        run: |
+          $ux = (Resolve-Path windows/out/UxPlay/uxplay).Path
+          $msys = '${{ steps.msys2.outputs.msys2-location }}'
+          # Only the bundle and Windows itself: proves nothing is loaded from MSYS2.
+          $env:PATH = "$ux\bin;C:\Windows\System32;C:\Windows"
+          $env:GST_PLUGIN_SYSTEM_PATH_1_0 = "$ux\lib\gstreamer-1.0"
+          $env:GST_PLUGIN_SCANNER_1_0 = "$ux\libexec\gstreamer-1.0\gst-plugin-scanner.exe"
+          $env:GST_REGISTRY_1_0 = "$env:RUNNER_TEMP\gst-registry.bin"
+          $env:FONTCONFIG_PATH = "$ux\etc\fonts"
+          Remove-Item Env:GST_PLUGIN_PATH, Env:GST_PLUGIN_PATH_1_0 -ErrorAction SilentlyContinue
+
+          & "$ux\bin\uxplay.exe" -v
+          if ($LASTEXITCODE -ne 0) { throw "uxplay.exe -v failed ($LASTEXITCODE)" }
+
+          # GStreamer elements uxplay's pipelines use on Windows
+          $inspect = "$ux\bin\gst-inspect-1.0.exe"
+          Copy-Item "$msys\ucrt64\bin\gst-inspect-1.0.exe" $inspect
+          $missing = @()
+          foreach ($e in 'appsrc','queue','h264parse','h265parse','decodebin','avdec_h264','avdec_h265',
+                         'avdec_aac','avdec_alac','jpegdec','imagefreeze','textoverlay','videoflip',
+                         'videoconvert','videoscale','autovideosink','d3d11videosink','autoaudiosink',
+                         'wasapisink','audioconvert','audioresample','volume') {
+            & $inspect --exists $e
+            if ($LASTEXITCODE -ne 0) { $missing += $e }
+          }
+          Remove-Item $inspect
+          if ($missing) { throw "Missing GStreamer elements: $($missing -join ', ')" }
+
+          # Start the receiver for a few seconds and make sure it comes up cleanly.
+          $p = Start-Process "$ux\bin\uxplay.exe" -ArgumentList '-n','CI','-nh' -PassThru -NoNewWindow `
+                 -RedirectStandardOutput "$env:RUNNER_TEMP\out.txt" -RedirectStandardError "$env:RUNNER_TEMP\err.txt"
+          Start-Sleep -Seconds 15
+          $alive = -not $p.HasExited
+          if ($alive) { Stop-Process -Id $p.Id -Force }
+          $log = (Get-Content "$env:RUNNER_TEMP\out.txt", "$env:RUNNER_TEMP\err.txt" -Raw) -join "`n"
+          Write-Output $log
+          if (-not $alive) { throw "uxplay.exe exited early (code $($p.ExitCode))" }
+          if ($log -match 'gst_parse_launch error|no element') { throw "uxplay.exe reported a GStreamer error" }
+
+      - name: Upload portable app
+        uses: actions/upload-artifact@v4
+        with:
+          name: UxPlay-Windows-portable
+          path: windows/out/UxPlay
+          if-no-files-found: error
