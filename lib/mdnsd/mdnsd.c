@@ -345,47 +345,91 @@ static int mdns_query_type_matches(uint16_t query_type, uint16_t record_type)
     return query_type == record_type || query_type == DNS_TYPE_ANY;
 }
 
+#ifdef _WIN32
+/* Adapters that are not the PC's own Wi-Fi or Ethernet: Hyper-V/WSL switches,
+ * virtual machines and VPN tunnels. An iPhone on the local network can't reach
+ * an address on one of these, so it must never be the one advertised. */
+static int mdns_is_virtual_adapter(const IP_ADAPTER_ADDRESSES *a)
+{
+    static const wchar_t *const names[] = {
+        L"Hyper-V", L"Virtual", L"WSL", L"vEthernet", L"VPN", L"TAP-", L"Wintun",
+        L"WireGuard", L"Tailscale", L"ZeroTier", L"Loopback", NULL
+    };
+    if (a->IfType == IF_TYPE_SOFTWARE_LOOPBACK || a->IfType == IF_TYPE_TUNNEL ||
+        a->IfType == IF_TYPE_PPP) {
+        return 1;
+    }
+    for (int i = 0; names[i]; i++) {
+        if ((a->Description && wcsstr(a->Description, names[i])) ||
+            (a->FriendlyName && wcsstr(a->FriendlyName, names[i]))) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* The adapter's first usable IPv4 address (not a self-assigned 169.254.x.x one), or 0 */
+static uint32_t mdns_adapter_ipv4(const IP_ADAPTER_ADDRESSES *a)
+{
+    for (const IP_ADAPTER_UNICAST_ADDRESS *u = a->FirstUnicastAddress; u; u = u->Next) {
+        if (u->Address.lpSockaddr && u->Address.lpSockaddr->sa_family == AF_INET) {
+            uint32_t addr = ((const struct sockaddr_in *) u->Address.lpSockaddr)->sin_addr.s_addr;
+            uint32_t host = ntohl(addr);
+            if (host != 0 && (host >> 16) != 0xA9FE) {   /* 169.254.0.0/16 */
+                return addr;
+            }
+        }
+    }
+    return 0;
+}
+#endif
+
 static uint32_t mdns_get_default_ipv4(void)
 {
     uint32_t addr = 0;
 #ifdef _WIN32
     ULONG buflen = 15000;
     PIP_ADAPTER_ADDRESSES pAddresses = NULL;
-    DWORD dwRetVal = 0;
+    DWORD dwRetVal = ERROR_BUFFER_OVERFLOW;
 
-    pAddresses = (IP_ADAPTER_ADDRESSES *) malloc(buflen);
-    if (!pAddresses) {
-        return 0;
-    }
-    dwRetVal = GetAdaptersAddresses(AF_INET, GAA_FLAG_INCLUDE_GATEWAYS, NULL, pAddresses, &buflen);
-    if (dwRetVal == ERROR_BUFFER_OVERFLOW) {
+    /* the adapter list can grow between calls, so retry a few times */
+    for (int tries = 0; tries < 3 && dwRetVal == ERROR_BUFFER_OVERFLOW; tries++) {
         free(pAddresses);
-        pAddresses = (IP_ADAPTER_ADDRESSES *) malloc(buflen); 
+        pAddresses = (IP_ADAPTER_ADDRESSES *) malloc(buflen);
         if (!pAddresses) {
             return 0;
         }
-        dwRetVal = GetAdaptersAddresses(AF_INET, GAA_FLAG_INCLUDE_GATEWAYS, NULL, pAddresses, &buflen);
+        dwRetVal = GetAdaptersAddresses(AF_INET, GAA_FLAG_INCLUDE_GATEWAYS | GAA_FLAG_SKIP_ANYCAST |
+                                        GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER,
+                                        NULL, pAddresses, &buflen);
     }
-    
+
     if (dwRetVal == NO_ERROR) {
-        PIP_ADAPTER_ADDRESSES pCurr = pAddresses;
-        while (pCurr) {
-            // Precise target filters to bypass the Hyper-V virtual adapter loopback capture
-            if (pCurr->OperStatus == IfOperStatusUp && 
-                pCurr->IfType != IF_TYPE_SOFTWARE_LOOPBACK &&
-                pCurr->FirstGatewayAddress != NULL && 
-                wcsstr(pCurr->Description, L"Hyper-V") == NULL &&
-                wcsstr(pCurr->Description, L"Virtual") == NULL &&
-                wcsstr(pCurr->Description, L"WSL") == NULL &&
-                wcsstr(pCurr->Description, L"vEthernet") == NULL) {
-                
-                if (pCurr->FirstUnicastAddress != NULL) {
-                    struct sockaddr_in *sockaddr_ipv4 = (struct sockaddr_in *)pCurr->FirstUnicastAddress->Address.lpSockaddr;
-                    addr = sockaddr_ipv4->sin_addr.s_addr;
-                    break; 
+        /* Of the connected Wi-Fi/Ethernet adapters with a default gateway, take the
+         * one Windows itself prefers: the lowest route metric. Only if there is none,
+         * fall back to any other connected adapter (e.g. a PC whose only network
+         * is a tunnel), rather than advertising no address at all. */
+        const IP_ADAPTER_ADDRESSES *best = NULL;
+        uint32_t best_addr = 0;
+        for (int strict = 1; strict >= 0 && !best; strict--) {
+            for (const IP_ADAPTER_ADDRESSES *pCurr = pAddresses; pCurr; pCurr = pCurr->Next) {
+                if (pCurr->OperStatus != IfOperStatusUp || pCurr->FirstGatewayAddress == NULL ||
+                    pCurr->IfType == IF_TYPE_SOFTWARE_LOOPBACK ||
+                    (strict && mdns_is_virtual_adapter(pCurr))) {
+                    continue;
+                }
+                uint32_t candidate = mdns_adapter_ipv4(pCurr);
+                if (candidate && (!best || pCurr->Ipv4Metric < best->Ipv4Metric)) {
+                    best = pCurr;
+                    best_addr = candidate;
                 }
             }
-            pCurr = pCurr->Next;
+        }
+        if (best) {
+            addr = best_addr;
+            unsigned char *b = (unsigned char *) &addr;
+            fprintf(stderr, "mDNS: advertising on %u.%u.%u.%u (%ls)\n", b[0], b[1], b[2], b[3],
+                    best->FriendlyName ? best->FriendlyName : L"network adapter");
         }
     }
     free(pAddresses);

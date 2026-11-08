@@ -1,0 +1,67 @@
+using System.Collections.Generic;
+using System.IO;
+
+namespace UxPlayTray
+{
+    /// <summary>Turns <see cref="Settings"/> into options for uxplay.exe.</summary>
+    static class UxPlayCommandLine
+    {
+        /// <param name="dataDir">Folder for the receiver's key and PIN register.</param>
+        /// <param name="recordingName">
+        /// Path and start of the recordings' file names when <see cref="Settings.Record"/> is on;
+        /// uxplay adds ".1.H264.AAC.mp4", ".2...." for each mirroring session.
+        /// </param>
+        public static string Build(Settings s, string dataDir, string recordingName = null)
+        {
+            var args = new List<string>();
+            // Show exactly this name on the iPhone (no "@hostname" suffix).
+            args.Add("-n " + Quote(s.DisplayName));
+            args.Add("-nh");
+            // Keep the same identity across restarts so the iPhone recognises this PC.
+            args.Add("-key " + Quote(Path.Combine(dataDir, "uxplay.pem")));
+            // A new connection takes over instead of being refused.
+            args.Add("-nohold");
+            if (s.HasOwnVideoSink)
+            {
+                // The user chose a video output in Advanced options; leave it alone.
+                if (s.FullScreen)
+                    args.Add("-fs");
+            }
+            else
+            {
+                // Direct3D 11 output: borderless full screen that can be switched with
+                // Alt+Enter, or from the tray menu, while mirroring.
+                string sink = "d3d11videosink fullscreen-toggle-mode=alt-enter+property";
+                if (s.FullScreen)
+                    sink += " fullscreen=true";
+                args.Add("-vs " + Quote(sink));
+            }
+            if (s.Resolution.Length > 0)
+                args.Add("-s " + s.Resolution);
+            // uxplay asks the iPhone for at most 30 frames per second unless told otherwise.
+            args.Add("-fps " + s.Fps);
+            // Show each frame as soon as it arrives instead of on its timestamp: less
+            // delay for games, at the cost of sound that can drift slightly from the picture.
+            if (s.LowLatency && !s.HasOption("-vsync"))
+                args.Add("-vsync no");
+            // YouTube app videos sent with AirPlay are streamed (HLS) and played by
+            // the PC itself, at full quality, instead of mirroring the iPhone's screen.
+            if (s.YouTubeVideo && !s.HasOption("-hls"))
+                args.Add("-hls");
+            if (!s.Audio)
+                args.Add("-as 0");
+            else if (s.AudioSink.Length > 0 && !s.HasOption("-as"))
+                args.Add("-as " + s.AudioSink);
+            // A random code each time; -reg remembers paired iPhones so it is asked only once.
+            if (s.RequirePin)
+                args.Add("-pin -reg " + Quote(Path.Combine(dataDir, "uxplay.register")));
+            if (s.Record && recordingName != null && !s.HasOption("-mp4"))
+                args.Add("-mp4 " + Quote(recordingName));
+            if (s.ExtraArgs.Length > 0)
+                args.Add(s.ExtraArgs);
+            return string.Join(" ", args);
+        }
+
+        static string Quote(string s) => "\"" + s + "\"";
+    }
+}

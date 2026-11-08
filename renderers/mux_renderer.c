@@ -98,7 +98,7 @@ void mux_renderer_start(void) {
 
     file_count++;
     GString *filename = g_string_new("");
-    g_string_append(filename, g_strdup_printf("%s.%d.", output_filename, file_count));
+    g_string_append_printf(filename, "%s.%d.", output_filename, file_count);
     if (!no_video && !audio_is_alac) {
         if (video_is_h265) {
             g_string_append(filename,"H265.");
@@ -152,8 +152,10 @@ void mux_renderer_start(void) {
     g_string_append(launch,
                     "mp4mux name=mux fragment-duration=2000 "
                     "fragment-mode=first-moov-then-finalise "
-                    "! filesink name=filesink location=");
-    g_string_append(launch, filename->str);
+                    "! filesink name=filesink");
+    /* the location is set on the element below, not written into the launch
+     * string: there a Windows path's backslashes would be read as escapes and
+     * a space would end the value */
 
     logger_log(logger, LOGGER_DEBUG, "created Mux pipeline: %s", launch->str);
 
@@ -163,7 +165,7 @@ void mux_renderer_start(void) {
     if (error) {
         logger_log(logger, LOGGER_ERR, "Mux pipeline error: %s", error->message);
         g_clear_error(&error);
-        g_free(filename);
+        g_string_free(filename, TRUE);
         return;
     }
 
@@ -190,6 +192,7 @@ void mux_renderer_start(void) {
     }
 
     renderer->filesink = gst_bin_get_by_name(GST_BIN(renderer->pipeline), "filesink");
+    g_object_set(renderer->filesink, "location", filename->str, NULL);
     renderer->bus = gst_element_get_bus(renderer->pipeline);
 
     gst_element_set_state(renderer->pipeline, GST_STATE_PLAYING);

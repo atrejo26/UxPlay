@@ -8,18 +8,25 @@ namespace UxPlayTray
     sealed class SettingsForm : Form
     {
         readonly Settings settings;
+        readonly IStartupRegistration startup;
         readonly TextBox nameBox = new TextBox { Width = 260 };
         readonly ComboBox resolutionBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
         readonly ComboBox frameRateBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
         readonly CheckBox fullScreenBox = new CheckBox { Text = "Start in full screen (no borders) - switch any time with Alt+Enter", AutoSize = true };
+        readonly CheckBox lowLatencyBox = new CheckBox { Text = "Lowest delay (for games) - sound may lag the picture slightly", AutoSize = true };
+        readonly CheckBox youTubeBox = new CheckBox { Text = "Play YouTube videos sent with AirPlay in full quality (beta)", AutoSize = true };
         readonly CheckBox audioBox = new CheckBox { Text = "Play iPhone sound on this PC", AutoSize = true };
+        readonly ComboBox audioOutputBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
         readonly CheckBox pinBox = new CheckBox { Text = "Ask for a PIN the first time a new device connects", AutoSize = true };
+        readonly CheckBox recordBox = new CheckBox { Text = "Save a video of each mirroring session in Videos\\UxPlay", AutoSize = true };
         readonly CheckBox startupBox = new CheckBox { Text = "Start UxPlay when I sign in to Windows", AutoSize = true };
+        readonly CheckBox updatesBox = new CheckBox { Text = "Tell me when a new version of UxPlay is out", AutoSize = true };
         readonly TextBox extraBox = new TextBox { Width = 260 };
 
-        public SettingsForm(Settings settings)
+        public SettingsForm(Settings settings, IStartupRegistration startup)
         {
             this.settings = settings;
+            this.startup = startup;
 
             Text = "UxPlay Settings";
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -32,12 +39,14 @@ namespace UxPlayTray
             AutoScaleMode = AutoScaleMode.Dpi;
             Font = SystemFonts.MessageBoxFont;
             Padding = new Padding(12);
-            Icon = TrayApp.AppIcon;
+            Icon = AppIcon.Default;
 
             foreach (var r in Settings.Resolutions)
                 resolutionBox.Items.Add(r.Label);
             foreach (var f in Settings.FrameRates)
                 frameRateBox.Items.Add(f.Label);
+            foreach (var o in Settings.AudioOutputs)
+                audioOutputBox.Items.Add(o.Label);
 
             nameBox.Text = settings.Name;
             int index = Array.FindIndex(Settings.Resolutions, r => r.Size == settings.Resolution);
@@ -45,9 +54,17 @@ namespace UxPlayTray
             int fpsIndex = Array.FindIndex(Settings.FrameRates, f => f.Fps == settings.Fps);
             frameRateBox.SelectedIndex = fpsIndex >= 0 ? fpsIndex : 0;
             fullScreenBox.Checked = settings.FullScreen;
+            lowLatencyBox.Checked = settings.LowLatency;
+            youTubeBox.Checked = settings.YouTubeVideo;
             audioBox.Checked = settings.Audio;
+            int audioIndex = Array.FindIndex(Settings.AudioOutputs, o => o.Sink == settings.AudioSink);
+            audioOutputBox.SelectedIndex = audioIndex >= 0 ? audioIndex : 0;
+            audioOutputBox.Enabled = audioBox.Checked;
+            audioBox.CheckedChanged += (s, e) => audioOutputBox.Enabled = audioBox.Checked;
             pinBox.Checked = settings.RequirePin;
-            startupBox.Checked = Settings.StartWithWindows;
+            startupBox.Checked = startup.Enabled;
+            updatesBox.Checked = settings.CheckForUpdates;
+            recordBox.Checked = settings.Record;
             extraBox.Text = settings.ExtraArgs;
 
             var grid = new TableLayoutPanel
@@ -58,12 +75,28 @@ namespace UxPlayTray
                 Dock = DockStyle.Fill,
             };
             AddRow(grid, "Name shown on iPhone:", nameBox);
+            AddSection(grid, "Picture");
             AddRow(grid, "Quality:", resolutionBox);
             AddRow(grid, "Smoothness:", frameRateBox);
             AddRow(grid, null, fullScreenBox);
+            AddRow(grid, null, lowLatencyBox);
+            AddRow(grid, null, youTubeBox);
+            AddSection(grid, "Sound");
             AddRow(grid, null, audioBox);
+            AddRow(grid, "Sound output:", audioOutputBox);
+            AddSection(grid, "Privacy and recording");
             AddRow(grid, null, pinBox);
+            AddRow(grid, null, recordBox);
+            AddRow(grid, null, new Label
+            {
+                Text = "Recordings can take a few GB for each hour of mirroring.",
+                AutoSize = true,
+                ForeColor = SystemColors.GrayText,
+                Margin = new Padding(3, 0, 3, 8),
+            });
+            AddSection(grid, "This PC");
             AddRow(grid, null, startupBox);
+            AddRow(grid, null, updatesBox);
             AddRow(grid, "Advanced options:", extraBox);
             var hint = new Label
             {
@@ -94,6 +127,21 @@ namespace UxPlayTray
             Controls.Add(grid);
         }
 
+        /// <summary>A bold heading across both columns, to group the settings.</summary>
+        void AddSection(TableLayoutPanel grid, string title)
+        {
+            int row = grid.RowCount++;
+            var heading = new Label
+            {
+                Text = title,
+                AutoSize = true,
+                Font = new Font(Font, FontStyle.Bold),
+                Margin = new Padding(3, 10, 3, 2),
+            };
+            grid.Controls.Add(heading, 0, row);
+            grid.SetColumnSpan(heading, 2);
+        }
+
         static void AddRow(TableLayoutPanel grid, string label, Control control)
         {
             int row = grid.RowCount++;
@@ -109,12 +157,17 @@ namespace UxPlayTray
             settings.Resolution = Settings.Resolutions[resolutionBox.SelectedIndex].Size;
             settings.Fps = Settings.FrameRates[frameRateBox.SelectedIndex].Fps;
             settings.FullScreen = fullScreenBox.Checked;
+            settings.LowLatency = lowLatencyBox.Checked;
+            settings.YouTubeVideo = youTubeBox.Checked;
             settings.Audio = audioBox.Checked;
+            settings.AudioSink = Settings.AudioOutputs[audioOutputBox.SelectedIndex].Sink;
             settings.RequirePin = pinBox.Checked;
             settings.ExtraArgs = extraBox.Text.Trim();
+            settings.CheckForUpdates = updatesBox.Checked;
+            settings.Record = recordBox.Checked;
             try
             {
-                Settings.StartWithWindows = startupBox.Checked;
+                startup.Enabled = startupBox.Checked;
             }
             catch (Exception ex) when (ex is UnauthorizedAccessException || ex is System.Security.SecurityException)
             {

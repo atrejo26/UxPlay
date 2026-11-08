@@ -30,7 +30,7 @@ namespace UxPlayTray
             AutoScaleMode = AutoScaleMode.Dpi;
             Font = SystemFonts.MessageBoxFont;
             Padding = new Padding(16);
-            Icon = TrayApp.AppIcon;
+            Icon = AppIcon.Default;
 
             var layout = new FlowLayoutPanel
             {

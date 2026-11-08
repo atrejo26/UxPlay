@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Unit tests for the parts of the tray app that don't need Windows: the uxplay
+       command line built from the settings, saving and loading the settings, and
+       following uxplay's messages (PIN, connect, disconnect).
+       Runs anywhere with:  dotnet test windows/tests -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
+  <!-- Code coverage of the tray app's logic, measured on every "dotnet test". The tray
+       sources are compiled into this test assembly, so it is measured and the tests
+       themselves are left out. Code that only starts real programs or talks to the
+       network is marked [ExcludeFromCodeCoverage] and checked by the Windows build.
+       The run fails below 95% of lines or 90% of branches. -->
+  <PropertyGroup>
+    <CollectCoverage>true</CollectCoverage>
+    <IncludeTestAssembly>true</IncludeTestAssembly>
+    <ExcludeByFile>**/TrayTests.cs%3b**/EdgeCaseTests.cs%3b**/Microsoft.NET.Test.Sdk.Program.cs</ExcludeByFile>
+    <Threshold>95%2c90</Threshold>
+    <ThresholdType>line,branch</ThresholdType>
+    <ThresholdStat>total</ThresholdStat>
+    <CoverletOutputFormat>cobertura</CoverletOutputFormat>
+    <CoverletOutput>$(MSBuildThisFileDirectory)TestResults/</CoverletOutput>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../tray/Settings.cs" Link="Settings.cs" />
+    <Compile Include="../tray/OutputPatterns.cs" Link="OutputPatterns.cs" />
+    <Compile Include="../tray/UxPlayCommandLine.cs" Link="UxPlayCommandLine.cs" />
+    <Compile Include="../tray/SettingsStore.cs" Link="SettingsStore.cs" />
+    <Compile Include="../tray/ConnectionMonitor.cs" Link="ConnectionMonitor.cs" />
+    <Compile Include="../tray/GStreamerEnvironment.cs" Link="GStreamerEnvironment.cs" />
+    <Compile Include="../tray/SoundTest.cs" Link="SoundTest.cs" />
+    <Compile Include="../tray/UpdateCheck.cs" Link="UpdateCheck.cs" />
+    <Compile Include="../tray/SoundTroubleshooter.cs" Link="SoundTroubleshooter.cs" />
+    <Compile Include="../tray/OnTopWatcher.cs" Link="OnTopWatcher.cs" />
+    <Compile Include="../tray/RestartPolicy.cs" Link="RestartPolicy.cs" />
+    <Compile Include="../tray/LogFile.cs" Link="LogFile.cs" />
+    <Compile Include="../tray/IMirrorWindow.cs" Link="IMirrorWindow.cs" />
+    <Compile Include="../tray/ScreenshotName.cs" Link="ScreenshotName.cs" />
+    <Compile Include="../tray/ErrorLog.cs" Link="ErrorLog.cs" />
+    <Compile Include="../tray/BugReport.cs" Link="BugReport.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.msbuild" Version="6.0.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+</Project>

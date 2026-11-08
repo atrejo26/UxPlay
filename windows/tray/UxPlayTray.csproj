@@ -12,7 +12,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Product>UxPlay</Product>
     <Description>UxPlay AirPlay receiver</Description>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
 
@@ -20,6 +20,11 @@
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />
     <EmbeddedResource Include="uxplay.ico" LogicalName="UxPlayTray.uxplay.ico" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ReleaseTag)' != ''">
+    <!-- set by the release build (-p:ReleaseTag=v1.74-win3); used to tell the user about newer releases -->
+    <AssemblyMetadata Include="ReleaseTag" Value="$(ReleaseTag)" />
   </ItemGroup>
 
   <ItemGroup>

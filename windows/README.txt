@@ -28,7 +28,12 @@ Right-click the UxPlay icon for:
     and starting UxPlay when you sign in to Windows. With "Ask for a PIN"
     on, a window shows the 4-digit code to type on the iPhone the first
     time it connects.
-  - Troubleshooting: Windows Firewall fix and the log
+  - Troubleshooting: Windows Firewall fix, test sound and the log
+  - Keep on top of other windows: the mirror window stays in front
+  - Save a screenshot: saves what the mirror window shows as a PNG
+    in Pictures\UxPlay
+  - Settings > Save a video of each mirroring session: MP4 files in Videos\UxPlay
+  - A notice when a new version is out (can be turned off in Settings)
 
 Smoother mirroring
 ------------------
@@ -37,17 +42,26 @@ Smoother mirroring
   - Use your router's 5 GHz Wi-Fi, keep the iPhone near the router, and
     connect the PC with an Ethernet cable if you can.
   - If the picture stutters, set Settings > Quality to 720p.
+  - Playing games? Settings > tick "Lowest delay".
 
 iPhone doesn't show this PC?
 ----------------------------
   - Check both are on the same Wi-Fi network (not a guest network).
   - Right-click the UxPlay icon > Troubleshooting > Allow through Windows Firewall.
+  - Using a VPN? Turn it off while mirroring, or allow local network access in it.
+  - Right-click the UxPlay icon > Troubleshooting > Show log: the line
+    "mDNS: advertising on ..." should show this PC's Wi-Fi or Ethernet address.
   - Right-click the UxPlay icon > Restart.
   - Still stuck: quit UxPlay, run uxplay\uxplay-console.bat and read
     the messages it prints.
+  - Asking for help? Troubleshooting > Copy details for a bug report, and
+    paste them into your message.
 
 No sound from the PC?
 ---------------------
+  - Right-click the UxPlay icon > Troubleshooting > Play a test sound. Heard
+    the beep? The PC's sound works: check the iPhone's volume and the firewall.
+    No beep? UxPlay tries compatibility mode and switches to it if it works.
   - Right-click the UxPlay icon > Settings: tick "Play iPhone sound on this PC".
   - While mirroring, the iPhone's volume buttons set the PC's volume: turn
     it up. Some apps and games stay quiet in Silent mode, so test with a video.
@@ -55,6 +69,8 @@ No sound from the PC?
     and not muted, on the speakers you expect.
   - Using ESET, Norton or another firewall? Allow uxplay.exe there for both
     TCP and UDP. The picture uses TCP but the sound uses UDP.
+  - Still nothing: Settings > Sound output, try "Windows audio (WASAPI)",
+    then "Compatibility mode (DirectSound)".
 
 UxPlay is open-source software (GPL v3); see uxplay\LICENSE.txt.
 Source code: https://github.com/atrejo26/UxPlay

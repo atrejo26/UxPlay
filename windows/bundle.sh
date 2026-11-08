@@ -7,8 +7,9 @@
 # Needs the ntldd package:  pacman -S $MINGW_PACKAGE_PREFIX-ntldd
 #
 # Resulting layout (UxPlay.exe, the tray app, is added next to "uxplay" separately):
-#     <output-dir>/uxplay/bin/uxplay.exe + DLLs
+#     <output-dir>/uxplay/bin/uxplay.exe, gst-launch-1.0.exe + DLLs
 #     <output-dir>/uxplay/lib/gstreamer-1.0/  GStreamer plugins
+#     <output-dir>/uxplay/lib/gio/modules/    GLib's TLS support (HTTPS for -hls)
 #     <output-dir>/uxplay/libexec/gstreamer-1.0/gst-plugin-scanner.exe
 #     <output-dir>/uxplay/etc/fonts/          fontconfig setup (for text overlays)
 #     <output-dir>/uxplay/uxplay-console.bat  run uxplay in a console, for troubleshooting
@@ -25,11 +26,26 @@ rm -rf "$UX"
 mkdir -p "$UX/bin" "$UX/lib/gstreamer-1.0" "$UX/libexec/gstreamer-1.0" "$UX/etc"
 
 cp "$BUILD/uxplay.exe" "$UX/bin/"
+# plays the tray app's test sound (Troubleshooting > Play a test sound)
+cp "$PREFIX/bin/gst-launch-1.0.exe" "$UX/bin/"
 cp "$PREFIX"/lib/gstreamer-1.0/*.dll "$UX/lib/gstreamer-1.0/"
 cp "$PREFIX/libexec/gstreamer-1.0/gst-plugin-scanner.exe" "$UX/libexec/gstreamer-1.0/"
 if [ -d "$PREFIX/etc/fonts" ]; then
     cp -r "$PREFIX/etc/fonts" "$UX/etc/"
 fi
+# GStreamer's HTTP(S) source loads libsoup at run time, which ntldd can't see, and
+# HTTPS needs GLib's TLS module: bundle both so -hls (YouTube video) works.
+shopt -s nullglob
+for soup in "$PREFIX"/bin/libsoup-3.0-*.dll; do
+    cp "$soup" "$UX/bin/"
+done
+# Only GLib's TLS backend: the proxy modules (GNOME, libproxy) need GSettings
+# schemas, and without them GLib aborts the program as soon as they load.
+mkdir -p "$UX/lib/gio/modules"
+for module in "$PREFIX"/lib/gio/modules/libgiognutls*.dll "$PREFIX"/lib/gio/modules/libgioopenssl*.dll; do
+    cp "$module" "$UX/lib/gio/modules/"
+done
+ls "$UX"/lib/gio/modules/*.dll >/dev/null 2>&1 || { echo "GLib's TLS module (glib-networking) is missing" >&2; exit 1; }
 cp "$HERE/uxplay-console.bat" "$UX/"
 cp "$HERE/../LICENSE" "$UX/LICENSE.txt"
 
@@ -37,7 +53,8 @@ cp "$HERE/../LICENSE" "$UX/LICENSE.txt"
 # ntldd prints lines like:  libglib-2.0-0.dll => C:\msys64\ucrt64\bin\libglib-2.0-0.dll (0x...)
 prefix_win=$(cygpath -w "$PREFIX/bin" | tr '[:upper:]' '[:lower:]')
 mapfile -t deps < <(
-    ntldd -R "$UX"/bin/*.exe "$UX"/libexec/gstreamer-1.0/*.exe "$UX"/lib/gstreamer-1.0/*.dll 2>/dev/null |
+    ntldd -R "$UX"/bin/*.exe "$UX"/bin/*.dll "$UX"/libexec/gstreamer-1.0/*.exe "$UX"/lib/gstreamer-1.0/*.dll \
+             "$UX"/lib/gio/modules/*.dll 2>/dev/null |
     awk '{ print $3 }' |
     while IFS= read -r path; do
         lower=$(printf '%s' "$path" | tr '[:upper:]' '[:lower:]')
