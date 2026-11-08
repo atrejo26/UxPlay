@@ -2,6 +2,9 @@
 
 ### **Now developed at the GitHub site <https://github.com/FDH2/UxPlay> (where ALL user issues should be posted, and latest versions can be found).**
 
+> **Windows app (this fork):** a ready-to-run Windows version with an installer and a
+> system-tray app, built automatically by GitHub Actions. See [windows/README.md](windows/README.md).
+
 -   **NEW in v 1.74 (Experimental) (June 2026)
 
      **This is a trial of a future release with new contributed code that provides
