@@ -10,7 +10,8 @@ namespace UxPlayTray
         readonly Settings settings;
         readonly TextBox nameBox = new TextBox { Width = 260 };
         readonly ComboBox resolutionBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
-        readonly CheckBox fullScreenBox = new CheckBox { Text = "Open the mirrored screen in full screen", AutoSize = true };
+        readonly ComboBox frameRateBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
+        readonly CheckBox fullScreenBox = new CheckBox { Text = "Start in full screen (no borders) - switch any time with Alt+Enter", AutoSize = true };
         readonly CheckBox audioBox = new CheckBox { Text = "Play iPhone sound on this PC", AutoSize = true };
         readonly CheckBox pinBox = new CheckBox { Text = "Ask for a PIN the first time a new device connects", AutoSize = true };
         readonly CheckBox startupBox = new CheckBox { Text = "Start UxPlay when I sign in to Windows", AutoSize = true };
@@ -36,10 +37,14 @@ namespace UxPlayTray
 
             foreach (var r in Settings.Resolutions)
                 resolutionBox.Items.Add(r.Label);
+            foreach (var f in Settings.FrameRates)
+                frameRateBox.Items.Add(f.Label);
 
             nameBox.Text = settings.Name;
             int index = Array.FindIndex(Settings.Resolutions, r => r.Size == settings.Resolution);
             resolutionBox.SelectedIndex = index >= 0 ? index : 0;
+            int fpsIndex = Array.FindIndex(Settings.FrameRates, f => f.Fps == settings.Fps);
+            frameRateBox.SelectedIndex = fpsIndex >= 0 ? fpsIndex : 0;
             fullScreenBox.Checked = settings.FullScreen;
             audioBox.Checked = settings.Audio;
             pinBox.Checked = settings.RequirePin;
@@ -55,6 +60,7 @@ namespace UxPlayTray
             };
             AddRow(grid, "Name shown on iPhone:", nameBox);
             AddRow(grid, "Quality:", resolutionBox);
+            AddRow(grid, "Smoothness:", frameRateBox);
             AddRow(grid, null, fullScreenBox);
             AddRow(grid, null, audioBox);
             AddRow(grid, null, pinBox);
@@ -102,6 +108,7 @@ namespace UxPlayTray
         {
             settings.Name = Settings.CleanName(nameBox.Text);
             settings.Resolution = Settings.Resolutions[resolutionBox.SelectedIndex].Size;
+            settings.Fps = Settings.FrameRates[frameRateBox.SelectedIndex].Fps;
             settings.FullScreen = fullScreenBox.Checked;
             settings.Audio = audioBox.Checked;
             settings.RequirePin = pinBox.Checked;

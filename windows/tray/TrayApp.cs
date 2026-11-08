@@ -29,6 +29,7 @@ namespace UxPlayTray
         readonly JobObject job = new JobObject();
         readonly EventWaitHandle showEvent;
         readonly RegisteredWaitHandle showWait;
+        readonly System.Windows.Forms.Timer pendingRestartTimer;
 
         Settings settings = Settings.Load();
         Process server;
@@ -36,6 +37,7 @@ namespace UxPlayTray
         bool stopping;
         DateTime startedAt;
         SettingsForm settingsForm;
+        bool restartPending;  // apply changed settings once nothing is being mirrored
 
         public TrayApp()
         {
@@ -49,6 +51,7 @@ namespace UxPlayTray
             fullScreenItem = new ToolStripMenuItem("Full screen", null, (s, e) => ToggleFullScreen())
             {
                 Checked = settings.FullScreen,
+                ShortcutKeyDisplayString = "Alt+Enter",
             };
 
             var menu = new ContextMenuStrip();
@@ -77,6 +80,10 @@ namespace UxPlayTray
                 Visible = true,
             };
             tray.DoubleClick += (s, e) => ShowHowToConnect();
+
+            pendingRestartTimer = new System.Windows.Forms.Timer { Interval = 3000 };
+            pendingRestartTimer.Tick += (s, e) => ApplyPendingRestart();
+            pendingRestartTimer.Start();
 
             // A second launch of UxPlay.exe signals this event instead of starting another copy.
             showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, Program.ShowEventName);
@@ -146,6 +153,7 @@ namespace UxPlayTray
                 server = p;
                 startedAt = DateTime.Now;
                 stopping = false;
+                restartPending = false;
                 SetStatus("Ready - waiting for iPhone");
                 return true;
             }
@@ -326,7 +334,19 @@ namespace UxPlayTray
             settings.FullScreen = !settings.FullScreen;
             fullScreenItem.Checked = settings.FullScreen;
             settings.Save();
-            if (server != null)
+            if (server == null)
+                return;
+            // While mirroring, switch the open window right away so the connection is
+            // kept; uxplay picks up the saved setting once nothing is being mirrored.
+            if (!settings.HasOwnVideoSink && MirrorWindow.SetFullScreen(server.Id, settings.FullScreen))
+                restartPending = true;
+            else
+                RestartServer();
+        }
+
+        void ApplyPendingRestart()
+        {
+            if (restartPending && server != null && !MirrorWindow.Exists(server.Id))
                 RestartServer();
         }
 
@@ -406,6 +426,7 @@ namespace UxPlayTray
             if (disposing)
             {
                 StopServer();
+                pendingRestartTimer.Dispose();
                 showWait.Unregister(null);
                 showEvent.Dispose();
                 tray.Visible = false;

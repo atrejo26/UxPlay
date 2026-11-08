@@ -3,7 +3,9 @@ name: Windows App
 # Builds the ready-to-run Windows version of UxPlay: uxplay.exe with all the
 # DLLs and GStreamer plugins it needs, plus the UxPlay.exe tray app.
 # Download the installer or the portable folder from the run's "Artifacts"
-# section; tags starting with "v" also publish them as a GitHub Release.
+# section. To publish them as a GitHub Release, either push a tag starting
+# with "v", or run this workflow from the Actions tab ("Run workflow") on
+# master with a release tag such as v1.74-win2.
 
 on:
   push:
@@ -12,6 +14,11 @@ on:
   pull_request:
     branches: [ master, main ]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Publish a GitHub Release with this new tag (e.g. v1.74-win2); leave empty to only build'
+        required: false
+        default: ''
 
 jobs:
   windows-app:
@@ -89,7 +96,9 @@ jobs:
           if ($missing) { throw "Missing GStreamer elements: $($missing -join ', ')" }
 
           # Start the receiver for a few seconds and make sure it comes up cleanly.
-          $p = Start-Process "$ux\bin\uxplay.exe" -ArgumentList '-n','CI','-nh' -PassThru -NoNewWindow `
+          # Same video output options the tray app passes, so a rejected option fails here.
+          $uxArgs = '-n CI -nh -fps 60 -vs "d3d11videosink fullscreen-toggle-mode=alt-enter+property fullscreen=true"'
+          $p = Start-Process "$ux\bin\uxplay.exe" -ArgumentList $uxArgs -PassThru -NoNewWindow `
                  -RedirectStandardOutput "$env:RUNNER_TEMP\out.txt" -RedirectStandardError "$env:RUNNER_TEMP\err.txt"
           Start-Sleep -Seconds 15
           $alive = -not $p.HasExited
@@ -97,7 +106,7 @@ jobs:
           $log = (Get-Content "$env:RUNNER_TEMP\out.txt", "$env:RUNNER_TEMP\err.txt" -Raw) -join "`n"
           Write-Output $log
           if (-not $alive) { throw "uxplay.exe exited early (code $($p.ExitCode))" }
-          if ($log -match 'gst_parse_launch error|no element') { throw "uxplay.exe reported a GStreamer error" }
+          if ($log -match 'gst_parse_launch|no element|could not set property') { throw "uxplay.exe reported a GStreamer error" }
 
       - name: Upload portable app
         uses: actions/upload-artifact@v4
@@ -125,14 +134,28 @@ jobs:
           path: windows/out/UxPlay-Setup.exe
           if-no-files-found: error
 
-  # Pushing a tag such as "v1.74-win1" publishes both downloads on the repository's Releases page.
+  # Publishes both downloads on the repository's Releases page, for a pushed
+  # "v*" tag or a release_tag given when running the workflow by hand.
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
     needs: windows-app
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
     steps:
+      - name: Check release tag
+        if: inputs.release_tag != ''
+        run: |
+          case "$RELEASE_TAG" in
+            v*) ;;
+            *) echo "release_tag must start with v, got: $RELEASE_TAG"; exit 1 ;;
+          esac
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download builds
         uses: actions/download-artifact@v4
         with:
@@ -144,6 +167,11 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
+          # a release created by hand on GitHub keeps the notes typed there
+          name: ${{ inputs.release_tag != '' && format('UxPlay for Windows ({0})', inputs.release_tag) || '' }}
+          body_path: ${{ inputs.release_tag != '' && 'windows/RELEASE_NOTES.md' || '' }}
           files: |
             dist/UxPlay-Windows-installer/UxPlay-Setup.exe
             dist/UxPlay-Windows-portable.zip

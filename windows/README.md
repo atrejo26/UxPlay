@@ -15,9 +15,12 @@ GitHub builds it automatically with the **Windows App** workflow
   under *Artifacts*. Unzip it and run `UxPlay-Setup.exe`.
 - **Portable:** download **UxPlay-Windows-portable** from the same run, unzip
   it anywhere and double-click `UxPlay.exe`.
-- **Releases:** pushing a tag that starts with `v` (for example
-  `git tag v1.74-win1 && git push origin v1.74-win1`) also publishes both
-  files on the repository's **Releases** page.
+- **Releases:** to publish both files on the repository's **Releases** page,
+  open **Actions → Windows App → Run workflow**, choose `master`, enter a new
+  tag such as `v1.74-win2` and click **Run workflow**. The release notes come
+  from `windows/RELEASE_NOTES.md`, so update its "What's new" section first.
+  Pushing a tag that starts with `v`, or creating a release on GitHub, also
+  works; a release created by hand keeps the notes typed there.
 
 The installer is not code-signed, so Windows SmartScreen may say *"Windows
 protected your PC"*. Click **More info → Run anyway**.
@@ -28,13 +31,35 @@ protected your PC"*. Click **More info → Run anyway**.
 2. Put the iPhone on the same Wi-Fi network as the PC.
 3. On the iPhone, open Control Center, tap **Screen Mirroring** and choose the PC.
 
-Right-click the tray icon for full screen, settings (name, quality, sound,
+Press **Alt+Enter** in the mirror window, or use **Full screen** in the tray
+menu, to switch between a window and borderless full screen without
+disconnecting. Right-click the tray icon for settings (name, quality, sound,
 PIN, start with Windows), restart, the log and a Windows Firewall fix.
+
+### Smoother mirroring
+
+- **Settings → Smoothness** is 60 fps by default (UxPlay on its own asks the
+  iPhone for only 30). Pick 30 fps on an older PC or a weak Wi-Fi signal.
+- Wi-Fi matters most. Use your router's **5 GHz** network, keep the iPhone
+  near the router, and connect the PC with an **Ethernet cable** if you can.
+- If the picture stutters or freezes, set **Quality** to 720p.
+- Close heavy programs (games, video calls, big downloads) while mirroring.
 
 The installer adds a Windows Firewall rule for UxPlay on all network types,
 so the iPhone can find the PC even when Windows calls your home Wi-Fi
 "Public". On networks you don't trust, such as café Wi-Fi, quit UxPlay or
 turn on **Ask for a PIN** in Settings.
+
+### No sound?
+
+- In **Settings**, tick **Play iPhone sound on this PC**.
+- While mirroring, the iPhone's volume buttons set the PC's volume, so turn it
+  up. Some apps and games stay quiet in Silent mode, so test with a video.
+- Open Windows' **Volume mixer** while sound plays. `uxplay.exe` should be
+  listed, not muted, and on the speakers you expect.
+- With a third-party firewall (ESET, Norton and so on), allow `uxplay.exe` for
+  both **TCP and UDP**. The picture arrives over TCP but the sound over UDP,
+  so a TCP-only rule gives you video with no sound.
 
 ## What's in this folder
 
@@ -43,6 +68,7 @@ turn on **Ask for a PIN** in Settings.
 | `tray/` | `UxPlay.exe`, the system-tray app (C#, .NET Framework 4.8, built into Windows 10/11). It runs `uxplay.exe` hidden, with the options from its Settings window. |
 | `bundle.sh` | Run in MSYS2 after building: copies `uxplay.exe`, its DLLs and the GStreamer plugins into one self-contained folder. |
 | `uxplay-console.bat` | Runs the bundled `uxplay.exe` in a console window for troubleshooting. |
+| `RELEASE_NOTES.md` | Notes used for releases published from the Actions tab. |
 | `installer.iss` | Inno Setup script for `UxPlay-Setup.exe`: shortcuts, firewall rule, optional start at sign-in, uninstaller. |
 | `README.txt` | Quick-start guide shipped inside the app folder. |
 | `tools/make_icon.py` | Draws `tray/uxplay.ico` (needs Pillow). |
