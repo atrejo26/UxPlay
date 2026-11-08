@@ -1,3 +1,5 @@
+using System.IO;
+using System.Threading.Tasks;
 using UxPlayTray;
 using Xunit;
 
@@ -255,5 +257,31 @@ public class ConnectionMonitorTests
         m.OnLine("connection request from A (iPhone) with deviceID = 1");
         m.Reset();
         Assert.False(m.IsConnected);
+    }
+}
+
+public class SoundTestTests
+{
+    [Fact]
+    public void AutomaticOutputUsesAutoaudiosink()
+    {
+        string args = GStreamerSoundTest.Arguments("");
+        Assert.StartsWith("-q audiotestsrc num-buffers=", args);
+        Assert.EndsWith("! autoaudiosink", args);
+    }
+
+    [Fact]
+    public void ChosenOutputIsUsed()
+    {
+        foreach (var (_, sink) in Settings.AudioOutputs)
+            if (sink.Length > 0)
+                Assert.EndsWith("! " + sink, GStreamerSoundTest.Arguments(sink));
+    }
+
+    [Fact]
+    public async Task MissingLauncherIsReportedNotThrown()
+    {
+        var test = new GStreamerSoundTest(Path.Combine(Path.GetTempPath(), "no-such-uxplay"), Path.GetTempPath());
+        Assert.Equal(SoundTestResult.Unavailable, await test.PlayAsync(""));
     }
 }

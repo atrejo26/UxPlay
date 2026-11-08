@@ -17,6 +17,8 @@
     <Compile Include="../tray/UxPlayCommandLine.cs" Link="UxPlayCommandLine.cs" />
     <Compile Include="../tray/SettingsStore.cs" Link="SettingsStore.cs" />
     <Compile Include="../tray/ConnectionMonitor.cs" Link="ConnectionMonitor.cs" />
+    <Compile Include="../tray/GStreamerEnvironment.cs" Link="GStreamerEnvironment.cs" />
+    <Compile Include="../tray/SoundTest.cs" Link="SoundTest.cs" />
   </ItemGroup>
 
   <ItemGroup>

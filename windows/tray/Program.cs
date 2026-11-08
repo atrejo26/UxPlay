@@ -44,6 +44,7 @@ namespace UxPlayTray
                 MirrorWindow = new MirrorWindow(),
                 KeepAwake = new KeepAwake(),
                 Firewall = new WindowsFirewall(),
+                SoundTest = new GStreamerSoundTest(AppPaths.ServerDir, AppPaths.DataDir),
             };
             // Disposing the app removes the tray icon and stops uxplay.exe on Quit.
             using (var app = new TrayApp(services))

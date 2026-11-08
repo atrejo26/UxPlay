@@ -94,12 +94,16 @@ jobs:
           foreach ($e in 'appsrc','queue','h264parse','h265parse','decodebin','avdec_h264','avdec_h265',
                          'avdec_aac','avdec_alac','jpegdec','imagefreeze','textoverlay','videoflip',
                          'videoconvert','videoscale','autovideosink','d3d11videosink','autoaudiosink',
-                         'wasapisink','directsoundsink','audioconvert','audioresample','volume') {
+                         'wasapisink','directsoundsink','audioconvert','audioresample','volume','audiotestsrc') {
             & $inspect --exists $e
             if ($LASTEXITCODE -ne 0) { $missing += $e }
           }
           Remove-Item $inspect
           if ($missing) { throw "Missing GStreamer elements: $($missing -join ', ')" }
+
+          # The tray app's test sound pipeline (no sound card on the runner, so into fakesink)
+          & "$ux\bin\gst-launch-1.0.exe" -q audiotestsrc num-buffers=10 freq=660 volume=0.3 ! audioconvert ! audioresample ! fakesink
+          if ($LASTEXITCODE -ne 0) { throw "the test sound pipeline failed ($LASTEXITCODE)" }
 
           # Start the receiver for a few seconds and make sure it comes up cleanly.
           # Same video output and PIN options the tray app passes, so a rejected option fails here.

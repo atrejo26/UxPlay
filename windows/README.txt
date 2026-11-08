@@ -28,7 +28,7 @@ Right-click the UxPlay icon for:
     and starting UxPlay when you sign in to Windows. With "Ask for a PIN"
     on, a window shows the 4-digit code to type on the iPhone the first
     time it connects.
-  - Troubleshooting: Windows Firewall fix and the log
+  - Troubleshooting: Windows Firewall fix, test sound and the log
 
 Smoother mirroring
 ------------------
@@ -48,6 +48,9 @@ iPhone doesn't show this PC?
 
 No sound from the PC?
 ---------------------
+  - Right-click the UxPlay icon > Troubleshooting > Play a test sound. Heard
+    the beep? The PC's sound works: check the iPhone's volume and the firewall.
+    No beep? UxPlay tries compatibility mode and switches to it if it works.
   - Right-click the UxPlay icon > Settings: tick "Play iPhone sound on this PC".
   - While mirroring, the iPhone's volume buttons set the PC's volume: turn
     it up. Some apps and games stay quiet in Silent mode, so test with a video.

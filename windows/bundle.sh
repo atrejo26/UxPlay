@@ -7,7 +7,7 @@
 # Needs the ntldd package:  pacman -S $MINGW_PACKAGE_PREFIX-ntldd
 #
 # Resulting layout (UxPlay.exe, the tray app, is added next to "uxplay" separately):
-#     <output-dir>/uxplay/bin/uxplay.exe + DLLs
+#     <output-dir>/uxplay/bin/uxplay.exe, gst-launch-1.0.exe + DLLs
 #     <output-dir>/uxplay/lib/gstreamer-1.0/  GStreamer plugins
 #     <output-dir>/uxplay/libexec/gstreamer-1.0/gst-plugin-scanner.exe
 #     <output-dir>/uxplay/etc/fonts/          fontconfig setup (for text overlays)
@@ -25,6 +25,8 @@ rm -rf "$UX"
 mkdir -p "$UX/bin" "$UX/lib/gstreamer-1.0" "$UX/libexec/gstreamer-1.0" "$UX/etc"
 
 cp "$BUILD/uxplay.exe" "$UX/bin/"
+# plays the tray app's test sound (Troubleshooting > Play a test sound)
+cp "$PREFIX/bin/gst-launch-1.0.exe" "$UX/bin/"
 cp "$PREFIX"/lib/gstreamer-1.0/*.dll "$UX/lib/gstreamer-1.0/"
 cp "$PREFIX/libexec/gstreamer-1.0/gst-plugin-scanner.exe" "$UX/libexec/gstreamer-1.0/"
 if [ -d "$PREFIX/etc/fonts" ]; then

@@ -4,6 +4,7 @@ Mirror your iPhone or iPad screen to your Windows PC with AirPlay. No MSYS2, Bon
 
 ### What's new
 - **Sound output choice (beta).** Settings → **Sound output**: if you see the picture but hear nothing, try *Windows audio (WASAPI)* or *Compatibility mode (DirectSound)*.
+- **Play a test sound** (Troubleshooting menu): a beep through the same sound output as mirroring, so you can tell a PC sound problem from a network one. If it can't be heard, UxPlay tries compatibility mode and switches to it when that works.
 - **About / check for updates** in the tray menu, and **Troubleshooting → Open UxPlay's data folder**.
 - **Borderless full screen that you can switch at any time.** Press **Alt+Enter** in the mirror window, or use **Full screen** in the tray menu, without disconnecting your iPhone. Settings has an option to start in full screen.
 - **Smoother video:** mirroring now runs at 60 fps by default (UxPlay on its own uses 30). Settings → **Smoothness** has a 30 fps option for older PCs or weak Wi-Fi.

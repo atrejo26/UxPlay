@@ -58,6 +58,10 @@ turn on **Ask for a PIN** in Settings.
 
 ### No sound?
 
+- Right-click the tray icon → **Troubleshooting → Play a test sound**. If you
+  hear the beep, the PC's sound works and the problem is the network or the
+  iPhone's volume. If you don't, UxPlay tries compatibility mode and switches
+  to it if that one is heard.
 - In **Settings**, tick **Play iPhone sound on this PC**.
 - While mirroring, the iPhone's volume buttons set the PC's volume, so turn it
   up. Some apps and games stay quiet in Silent mode, so test with a video.
@@ -92,6 +96,8 @@ that picks the concrete classes.
 | --- | --- |
 | `TrayApp` | Tray icon and menu; coordinates the parts below |
 | `IReceiver` / `ReceiverProcess` | Starts and stops `uxplay.exe` with the bundled GStreamer; its log; job object |
+| `GStreamerEnvironment` | Points the bundled GStreamer programs at the bundled plugins |
+| `ISoundTest` / `GStreamerSoundTest` | Plays the test beep through the chosen sound output |
 | `ConnectionMonitor` | Reads uxplay's messages: PIN asked, iPhone connected, iPhone gone |
 | `OutputPatterns` | The uxplay messages it recognises |
 | `Settings` | What the user chose (plain data) |
