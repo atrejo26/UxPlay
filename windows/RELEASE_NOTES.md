@@ -3,7 +3,7 @@
 Mirror your iPhone or iPad screen to your Windows PC with AirPlay. No MSYS2, Bonjour or compiling needed.
 
 ### What's new
-- **Tested before every release.** 158 unit tests cover everyday use and the hard cases: broken settings files, odd device names, devices taking turns, and thousands of random inputs. Every build measures their coverage (99% of lines, 97% of branches) and fails below 95% / 90%. A release can only be published from a build that passed them.
+- **Tested before every release.** 170 unit tests cover everyday use and the hard cases: broken settings files, odd device names, devices taking turns, and thousands of random inputs. Every build measures their coverage (99% of lines, 97% of branches) and fails below 95% / 90%. A release can only be published from a build that passed them.
 - **No endless restart loops.** If uxplay.exe crashes, UxPlay still restarts it by itself, but after 3 crashes in 10 minutes it stops and tells you, with the log one click away.
 - **Fixes found by the new tests:** a device name with brackets, such as "Sam's (Work) iPhone", is shown in full; a malformed message from uxplay can no longer crash the tray app; a hand-edited quality value in settings.ini can't add uxplay options; Advanced options separated by tabs are recognised.
 - **Sound output choice (beta).** Settings → **Sound output**: if you see the picture but hear nothing, try *Windows audio (WASAPI)* or *Compatibility mode (DirectSound)*.
@@ -18,6 +18,7 @@ Mirror your iPhone or iPad screen to your Windows PC with AirPlay. No MSYS2, Bon
 - **Keep on top of other windows** (tray menu): the mirror window stays above your other windows, handy for following along on the iPhone while you work.
 - **New-version notice.** About a minute after UxPlay starts, it checks once whether a newer release is out and shows a notice you can click to download it. Turn it off in Settings.
 - **About / check for updates** in the tray menu, and **Troubleshooting → Open UxPlay's data folder**.
+- **Troubleshooting → Copy details for a bug report:** copies the app and Windows versions, UxPlay's options and the end of the log, ready to paste into an issue. Your Windows account name is left out.
 - **Borderless full screen that you can switch at any time.** Press **Alt+Enter** in the mirror window, or use **Full screen** in the tray menu, without disconnecting your iPhone. Settings has an option to start in full screen.
 - **Smoother video:** mirroring now runs at 60 fps by default (UxPlay on its own uses 30). Settings → **Smoothness** has a 30 fps option for older PCs or weak Wi-Fi.
 - **PIN codes now appear on screen.** With **Ask for a PIN** turned on, a window shows the 4-digit code to type on your iPhone. Before, the code was hidden and couldn't be read.

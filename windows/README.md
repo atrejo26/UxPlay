@@ -123,6 +123,7 @@ that picks the concrete classes.
 | `IMirrorWindow` / `MirrorWindow` | Finds the video window and switches full screen |
 | `RestartPolicy` | Restarts a crashed `uxplay.exe`, at most 3 times in 10 minutes, then tells the user |
 | `OnTopWatcher` | "Keep on top": retries until the video window has opened, for up to 30 s |
+| `BugReport` | "Copy details for a bug report": versions, options and the log's end, without the account name |
 | `ErrorLog` | tray-error.log: unexpected errors, kept below 1 MB (the older part moves to tray-error.old.log) |
 | `ScreenshotName` | File names for "Save a screenshot": date and time, never overwriting an earlier one |
 | `IKeepAwake` / `KeepAwake` | Keeps the screen on while mirroring |

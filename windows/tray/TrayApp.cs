@@ -125,6 +125,7 @@ namespace UxPlayTray
                     new ToolStripMenuItem("Allow through Windows Firewall", null, (s, e) => FixFirewall()),
                     soundTestItem,
                     new ToolStripMenuItem("Show log", null, (s, e) => ShowLog()),
+                    new ToolStripMenuItem("Copy details for a bug report", null, (s, e) => CopyBugReport()),
                     new ToolStripMenuItem("Open UxPlay's data folder", null, (s, e) => Open(AppPaths.DataDir))),
                 new ToolStripMenuItem("About UxPlay / check for updates", null, (s, e) => ShowAbout()),
                 new ToolStripSeparator(),
@@ -501,6 +502,25 @@ namespace UxPlayTray
                 "Your iPhone doesn't list this PC? Right-click the UxPlay icon near the clock and choose " +
                 "Troubleshooting > Allow through Windows Firewall.",
                 "UxPlay", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        void CopyBugReport()
+        {
+            string report = BugReport.Build(ReleaseTag.Current, Environment.OSVersion.VersionString +
+                    (Environment.Is64BitOperatingSystem ? " 64-bit" : ""),
+                OptionsForComparison(), BugReport.TailOfFile(AppPaths.LogFile, BugReport.LogLines),
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+            try
+            {
+                Clipboard.SetText(report);
+            }
+            catch (System.Runtime.InteropServices.ExternalException)
+            {
+                MessageBox.Show("Another program is using the clipboard. Please try again.", "UxPlay");
+                return;
+            }
+            ShowBalloon(6000, "Copied", "The details are on the clipboard: paste them into your bug report. " +
+                "They include this PC's name as shown on the iPhone and the end of the log.", ToolTipIcon.Info);
         }
 
         void ShowLog()

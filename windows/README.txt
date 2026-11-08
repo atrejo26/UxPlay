@@ -54,6 +54,8 @@ iPhone doesn't show this PC?
   - Right-click the UxPlay icon > Restart.
   - Still stuck: quit UxPlay, run uxplay\uxplay-console.bat and read
     the messages it prints.
+  - Asking for help? Troubleshooting > Copy details for a bug report, and
+    paste them into your message.
 
 No sound from the PC?
 ---------------------

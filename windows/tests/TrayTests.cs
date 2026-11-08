@@ -692,3 +692,42 @@ public class ErrorLogTests
         Assert.Equal(Path.Combine("d", "tray-error.old.log"), ErrorLog.OldPath(Path.Combine("d", "tray-error.log")));
     }
 }
+
+public class BugReportTests
+{
+    [Fact]
+    public void HasVersionWindowsOptionsAndLog()
+    {
+        string text = BugReport.Build("v1.74-win3-beta", "Microsoft Windows NT 10.0.22631.0 64-bit", "-n \"PC\" -fps 60",
+            new[] { "line one", "line two" }, @"C:\Users\sam");
+        Assert.Contains("UxPlay for Windows v1.74-win3-beta", text);
+        Assert.Contains("Windows: Microsoft Windows NT 10.0.22631.0 64-bit", text);
+        Assert.Contains("uxplay options: -n \"PC\" -fps 60", text);
+        Assert.Contains("line one" + Environment.NewLine + "line two", text);
+    }
+
+    [Fact]
+    public void HidesTheWindowsAccountName()
+    {
+        string text = BugReport.Build("v1", "w", @"-dacp C:\Users\Sam\AppData\Local\UxPlay\dacp",
+            new[] { @"saved c:\users\sam\Videos\UxPlay\a.mp4" }, @"C:\Users\Sam");
+        Assert.DoesNotContain("Sam", text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(@"%USERPROFILE%\AppData\Local\UxPlay\dacp", text);
+        Assert.Contains(@"%USERPROFILE%\Videos", text);
+    }
+
+    [Fact]
+    public void SaysWhenTheresNoLogOrNoRelease()
+    {
+        string text = BugReport.Build(null, "w", "", new string[0], "");
+        Assert.Contains("(not a release build)", text);
+        Assert.Contains("(the log is empty)", text);
+    }
+
+    [Fact]
+    public void TailKeepsTheLastLines()
+    {
+        var lines = BugReport.Tail(new StringReader("a\nb\nc\nd\n"), 2);
+        Assert.Equal(new[] { "c", "d" }, lines);
+    }
+}

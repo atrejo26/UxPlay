@@ -653,3 +653,75 @@ public class ErrorLogEdgeCases
         }
     }
 }
+
+public class BugReportEdgeCases
+{
+    [Theory]
+    [InlineData("")]
+    [InlineData(null)]
+    [InlineData(@"C:\")]
+    public void AShortOrMissingProfileFolderChangesNothing(string profile)
+    {
+        string text = BugReport.Build("v1", "w", @"-dacp C:\data", new[] { @"C:\x" }, profile);
+        Assert.Contains(@"-dacp C:\data", text);
+        Assert.DoesNotContain("%USERPROFILE%", text);
+    }
+
+    [Fact]
+    public void AProfileWithATrailingSlashIsStillHidden()
+    {
+        string text = BugReport.Build("v1", "w", @"C:\Users\Sam\x", new string[0], @"C:\Users\Sam\");
+        Assert.Contains(@"%USERPROFILE%\x", text);
+    }
+
+    [Fact]
+    public void FewerLinesThanAskedForIsFine()
+    {
+        Assert.Equal(new[] { "only" }, BugReport.Tail(new System.IO.StringReader("only"), 60));
+        Assert.Empty(BugReport.Tail(new System.IO.StringReader(""), 60));
+    }
+
+    [Fact]
+    public void AHugeLogOnlyHasItsEndRead()
+    {
+        string path = System.IO.Path.GetTempFileName();
+        try
+        {
+            using (var w = new System.IO.StreamWriter(path))
+                for (int i = 0; i < 200_000; i++)  // several MB
+                    w.WriteLine("line " + i);
+            var tail = BugReport.TailOfFile(path, 3);
+            Assert.Equal(new[] { "line 199997", "line 199998", "line 199999" }, tail);
+        }
+        finally
+        {
+            System.IO.File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void ALogStillBeingWrittenCanBeRead()
+    {
+        string path = System.IO.Path.GetTempFileName();
+        try
+        {
+            using (var writer = new System.IO.FileStream(path, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.ReadWrite | System.IO.FileShare.Delete))
+            {
+                var bytes = System.Text.Encoding.UTF8.GetBytes("first\nsecond\n");
+                writer.Write(bytes, 0, bytes.Length);
+                writer.Flush();
+                Assert.Equal(new[] { "first", "second" }, BugReport.TailOfFile(path, 60));
+            }
+        }
+        finally
+        {
+            System.IO.File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void NoLogFileGivesNoLines()
+    {
+        Assert.Empty(BugReport.TailOfFile(System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid() + ".log"), 60));
+    }
+}
