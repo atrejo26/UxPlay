@@ -52,6 +52,10 @@ namespace UxPlayTray
                     case "extra": s.ExtraArgs = val; break;
                 }
             }
+            // "-vs d3d11videosink" was the manual workaround for full screen before the
+            // app chose the Direct3D output itself; drop it so the built-in toggle works.
+            if (s.ExtraArgs == "-vs d3d11videosink")
+                s.ExtraArgs = "";
             return s;
         }
 
@@ -81,8 +85,21 @@ namespace UxPlayTray
             args.Add("-key " + Quote(Path.Combine(DataDir, "uxplay.pem")));
             // A new connection takes over instead of being refused.
             args.Add("-nohold");
-            if (FullScreen)
-                args.Add("-fs");
+            if (HasOwnVideoSink)
+            {
+                // The user chose a video output in Advanced options; leave it alone.
+                if (FullScreen)
+                    args.Add("-fs");
+            }
+            else
+            {
+                // Direct3D 11 output: borderless full screen that can be switched with
+                // Alt+Enter, or from the tray menu, while mirroring.
+                string sink = "d3d11videosink fullscreen-toggle-mode=alt-enter+property";
+                if (FullScreen)
+                    sink += " fullscreen=true";
+                args.Add("-vs " + Quote(sink));
+            }
             if (Resolution.Length > 0)
                 args.Add("-s " + Resolution);
             if (!Audio)
@@ -93,6 +110,10 @@ namespace UxPlayTray
                 args.Add(ExtraArgs);
             return string.Join(" ", args);
         }
+
+        /// <summary>True when the Advanced options pick their own video output (-vs).</summary>
+        public bool HasOwnVideoSink =>
+            (" " + ExtraArgs + " ").IndexOf(" -vs ", StringComparison.Ordinal) >= 0;
 
         public static string CleanName(string name)
         {

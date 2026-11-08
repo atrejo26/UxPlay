@@ -10,7 +10,7 @@ namespace UxPlayTray
         readonly Settings settings;
         readonly TextBox nameBox = new TextBox { Width = 260 };
         readonly ComboBox resolutionBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
-        readonly CheckBox fullScreenBox = new CheckBox { Text = "Open the mirrored screen in full screen", AutoSize = true };
+        readonly CheckBox fullScreenBox = new CheckBox { Text = "Start in full screen (no borders) - switch any time with Alt+Enter", AutoSize = true };
         readonly CheckBox audioBox = new CheckBox { Text = "Play iPhone sound on this PC", AutoSize = true };
         readonly CheckBox pinBox = new CheckBox { Text = "Ask for a PIN the first time a new device connects", AutoSize = true };
         readonly CheckBox startupBox = new CheckBox { Text = "Start UxPlay when I sign in to Windows", AutoSize = true };

@@ -28,7 +28,9 @@ protected your PC"*. Click **More info → Run anyway**.
 2. Put the iPhone on the same Wi-Fi network as the PC.
 3. On the iPhone, open Control Center, tap **Screen Mirroring** and choose the PC.
 
-Right-click the tray icon for full screen, settings (name, quality, sound,
+Press **Alt+Enter** in the mirror window, or use **Full screen** in the tray
+menu, to switch between a window and borderless full screen without
+disconnecting. Right-click the tray icon for settings (name, quality, sound,
 PIN, start with Windows), restart, the log and a Windows Firewall fix.
 
 The installer adds a Windows Firewall rule for UxPlay on all network types,

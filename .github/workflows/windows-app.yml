@@ -89,7 +89,9 @@ jobs:
           if ($missing) { throw "Missing GStreamer elements: $($missing -join ', ')" }
 
           # Start the receiver for a few seconds and make sure it comes up cleanly.
-          $p = Start-Process "$ux\bin\uxplay.exe" -ArgumentList '-n','CI','-nh' -PassThru -NoNewWindow `
+          # Same video output options the tray app passes, so a rejected option fails here.
+          $uxArgs = '-n CI -nh -vs "d3d11videosink fullscreen-toggle-mode=alt-enter+property fullscreen=true"'
+          $p = Start-Process "$ux\bin\uxplay.exe" -ArgumentList $uxArgs -PassThru -NoNewWindow `
                  -RedirectStandardOutput "$env:RUNNER_TEMP\out.txt" -RedirectStandardError "$env:RUNNER_TEMP\err.txt"
           Start-Sleep -Seconds 15
           $alive = -not $p.HasExited
@@ -97,7 +99,7 @@ jobs:
           $log = (Get-Content "$env:RUNNER_TEMP\out.txt", "$env:RUNNER_TEMP\err.txt" -Raw) -join "`n"
           Write-Output $log
           if (-not $alive) { throw "uxplay.exe exited early (code $($p.ExitCode))" }
-          if ($log -match 'gst_parse_launch error|no element') { throw "uxplay.exe reported a GStreamer error" }
+          if ($log -match 'gst_parse_launch|no element|could not set property') { throw "uxplay.exe reported a GStreamer error" }
 
       - name: Upload portable app
         uses: actions/upload-artifact@v4
