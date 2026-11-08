@@ -36,6 +36,11 @@ menu, to switch between a window and borderless full screen without
 disconnecting. Right-click the tray icon for settings (name, quality, sound,
 PIN, start with Windows), restart, the log and a Windows Firewall fix.
 
+With **Ask for a PIN** on, a window pops up with the 4-digit code to type on
+the iPhone the first time it connects; UxPlay remembers the iPhone after that.
+While an iPhone is connected the PC's screen stays on; when nothing is
+connected UxPlay sits idle and the PC sleeps as usual.
+
 ### Smoother mirroring
 
 - **Settings → Smoothness** is 60 fps by default (UxPlay on its own asks the

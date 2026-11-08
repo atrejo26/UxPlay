@@ -288,6 +288,10 @@ static void log(int level, const char* format, ...) {
     vprintf(format, vargs);
     printf("\n");
     va_end(vargs);
+    /* stdout is fully buffered when it is a pipe or a file, so without this a program
+       reading uxplay's output (such as the Windows tray app, which shows the pairing
+       PIN on screen) would get messages late, in chunks of several KB */
+    fflush(stdout);
 }
 
 #define LOGD(...) log(LOGGER_DEBUG, __VA_ARGS__)

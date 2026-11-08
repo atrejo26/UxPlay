@@ -27,6 +27,13 @@ namespace UxPlayTray
 
         public static bool Exists(int processId) => Find(processId).Count > 0;
 
+        /// <summary>Whether the mirror window is in full screen; null when no window is open.</summary>
+        public static bool? IsFullScreen(int processId)
+        {
+            var windows = Find(processId);
+            return windows.Count > 0 ? IsFullScreen(windows[0]) : (bool?)null;
+        }
+
         /// <summary>
         /// Puts every mirror window of the process into (or out of) full screen.
         /// Returns false when there is no window to change.

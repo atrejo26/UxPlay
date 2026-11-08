@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
@@ -29,7 +28,11 @@ namespace UxPlayTray
             {
                 Marshal.StructureToPtr(info, ptr, false);
                 if (!SetInformationJobObject(handle, JobObjectExtendedLimitInformation, ptr, (uint)size))
-                    throw new Win32Exception();
+                {
+                    // Best effort, as in Add: carry on without the job.
+                    CloseHandle(handle);
+                    handle = IntPtr.Zero;
+                }
             }
             finally
             {
