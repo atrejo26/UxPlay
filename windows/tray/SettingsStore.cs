@@ -55,7 +55,7 @@ namespace UxPlayTray
                 {
                     case "name": if (val.Length > 0) s.Name = val; break;
                     case "fullscreen": s.FullScreen = val == "1"; break;
-                    case "resolution": s.Resolution = val; break;
+                    case "resolution": if (Settings.IsValidResolution(val)) s.Resolution = val; break;
                     case "fps": if (int.TryParse(val, out int fps) && fps > 0 && fps <= 60) s.Fps = fps; break;
                     case "audio": s.Audio = val != "0"; break;
                     case "audiosink": if (Array.Exists(Settings.AudioOutputs, o => o.Sink == val)) s.AudioSink = val; break;

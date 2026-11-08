@@ -132,11 +132,29 @@ New features go in new classes, or new entries in the option tables in
 
 ### Tests and coverage
 
-`dotnet test windows/tests` runs the unit tests and measures their code
-coverage (coverlet); the Windows App workflow runs it on every push. The run
-fails if line or branch coverage of the tested files falls below **90%**, so
-new logic needs tests with it. The report is written to
-`windows/tests/TestResults/coverage.cobertura.xml`.
+A release must be rock solid, so the tests come in two layers:
+
+- **Everyday cases** (`tests/TrayTests.cs`): what normal use does. Each setting
+  and the uxplay options it gives, saving and loading settings, a PIN, a
+  connect and a disconnect, the update check, the sound test.
+- **Hard cases** (`tests/EdgeCaseTests.cs`): what can go wrong. A broken or
+  hand-edited `settings.ini`, one from an older version, odd device names
+  ("Sam's (Work) iPhone", other alphabets), huge or repeated socket numbers,
+  two devices taking turns, uxplay restarting mid-mirror, names that try to
+  break out of their quotes, unusual release tags and GitHub replies. Each
+  hard-case group also has a seeded random test: thousands of random settings,
+  settings files and uxplay messages that must never crash and never lose a
+  setting. The seed is fixed, so a failure always comes back the same way.
+
+`dotnet test windows/tests` runs both and measures code coverage (coverlet).
+**It fails below 95% of lines or 90% of branches**, so new logic needs tests
+with it. The report is written to `windows/tests/TestResults/coverage.cobertura.xml`.
+
+**Nothing is released untested.** The Windows App workflow runs these tests on
+every push and pull request. Its release job only runs after the whole build
+job has passed: the tests and coverage minimum, the check that the bundle
+works on its own, and a smoke start of the app with recording, low delay and
+YouTube video on.
 
 What is measured is the logic that doesn't need Windows: settings, the uxplay
 command line, reading uxplay's messages, release tags, the GStreamer
@@ -146,6 +164,8 @@ runs it for real (bundle check, test sound, smoke test). The windows and the
 tray menu (`TrayApp`, `SettingsForm`, `PinForm`, `MirrorWindow` and the other
 Win32 helpers) are thin layers over Windows and are checked by building them
 and by the smoke test, not by unit tests.
+
+When you fix a bug, add the test that would have caught it to the hard cases.
 
 Files the app keeps on the PC are in `%LOCALAPPDATA%\UxPlay`: `settings.ini`,
 `uxplay.log`, the receiver's key `uxplay.pem` (so the iPhone recognises the PC

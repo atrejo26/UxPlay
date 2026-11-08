@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace UxPlayTray
 {
@@ -52,7 +53,12 @@ namespace UxPlayTray
 
         /// <summary>True when the Advanced options contain this uxplay option.</summary>
         public bool HasOption(string option) =>
-            (" " + ExtraArgs + " ").IndexOf(" " + option + " ", StringComparison.Ordinal) >= 0;
+            Array.IndexOf(ExtraArgs.Split((char[])null, StringSplitOptions.RemoveEmptyEntries), option) >= 0;
+
+        static readonly Regex ResolutionPattern = new Regex(@"^\d{2,5}x\d{2,5}(@\d{1,3})?$", RegexOptions.CultureInvariant);
+
+        /// <summary>A quality uxplay understands: "" (its default) or WIDTHxHEIGHT, optionally @REFRESH.</summary>
+        public static bool IsValidResolution(string value) => value == "" || ResolutionPattern.IsMatch(value);
 
         /// <summary>The Settings window's name for a sound output.</summary>
         public static string AudioOutputLabel(string sink)

@@ -7,7 +7,7 @@ namespace UxPlayTray
     {
         /// <summary>An iPhone has paired and is starting to mirror: name (1) and model (2).</summary>
         public static readonly Regex ConnectRequest =
-            new Regex(@"connection request from (.+?) \((.*?)\) with deviceID");
+            new Regex(@"connection request from (.+) \(([^()]*)\) with deviceID");
 
         /// <summary>uxplay asks the iPhone for a code (with "Ask for a PIN"): the code (1).</summary>
         public static readonly Regex PinRequest =

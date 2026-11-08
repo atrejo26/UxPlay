@@ -10,7 +10,7 @@ namespace UxPlayTray
     /// </summary>
     sealed class ConnectionMonitor
     {
-        readonly HashSet<int> openSockets = new HashSet<int>();
+        readonly HashSet<long> openSockets = new HashSet<long>();
 
         /// <summary>The iPhone asks for a code: the 4 digits to type on it.</summary>
         public event Action<string> PinRequested;
@@ -47,13 +47,15 @@ namespace UxPlayTray
             m = OutputPatterns.SocketOpened.Match(line);
             if (m.Success)
             {
-                openSockets.Add(int.Parse(m.Groups[1].Value));
+                if (long.TryParse(m.Groups[1].Value, out long opened))
+                    openSockets.Add(opened);
                 return;
             }
             m = OutputPatterns.SocketClosed.Match(line);
             if (m.Success)
             {
-                openSockets.Remove(int.Parse(m.Groups[1].Value));
+                if (long.TryParse(m.Groups[1].Value, out long closed))
+                    openSockets.Remove(closed);
                 if (openSockets.Count == 0 && IsConnected)
                 {
                     IsConnected = false;
