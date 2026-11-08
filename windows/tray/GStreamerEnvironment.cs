@@ -20,6 +20,8 @@ namespace UxPlayTray
             env.Remove("GST_PLUGIN_PATH_1_0");
             env.Remove("GST_PLUGIN_SYSTEM_PATH");
             env["FONTCONFIG_PATH"] = Path.Combine(serverDir, "etc", "fonts");
+            // GLib's TLS support, for HTTPS downloads of HLS video
+            env["GIO_MODULE_DIR"] = Path.Combine(serverDir, "lib", "gio", "modules");
             // uxplay looks for ~/.uxplayrc and similar files under HOME
             env["HOME"] = dataDir;
         }
