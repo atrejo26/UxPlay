@@ -14,6 +14,7 @@ namespace UxPlayTray
         readonly ComboBox frameRateBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
         readonly CheckBox fullScreenBox = new CheckBox { Text = "Start in full screen (no borders) - switch any time with Alt+Enter", AutoSize = true };
         readonly CheckBox lowLatencyBox = new CheckBox { Text = "Lowest delay (for games) - sound may lag the picture slightly", AutoSize = true };
+        readonly CheckBox youTubeBox = new CheckBox { Text = "Play YouTube videos sent with AirPlay in full quality (beta)", AutoSize = true };
         readonly CheckBox audioBox = new CheckBox { Text = "Play iPhone sound on this PC", AutoSize = true };
         readonly ComboBox audioOutputBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
         readonly CheckBox pinBox = new CheckBox { Text = "Ask for a PIN the first time a new device connects", AutoSize = true };
@@ -54,6 +55,7 @@ namespace UxPlayTray
             frameRateBox.SelectedIndex = fpsIndex >= 0 ? fpsIndex : 0;
             fullScreenBox.Checked = settings.FullScreen;
             lowLatencyBox.Checked = settings.LowLatency;
+            youTubeBox.Checked = settings.YouTubeVideo;
             audioBox.Checked = settings.Audio;
             int audioIndex = Array.FindIndex(Settings.AudioOutputs, o => o.Sink == settings.AudioSink);
             audioOutputBox.SelectedIndex = audioIndex >= 0 ? audioIndex : 0;
@@ -73,12 +75,16 @@ namespace UxPlayTray
                 Dock = DockStyle.Fill,
             };
             AddRow(grid, "Name shown on iPhone:", nameBox);
+            AddSection(grid, "Picture");
             AddRow(grid, "Quality:", resolutionBox);
             AddRow(grid, "Smoothness:", frameRateBox);
             AddRow(grid, null, fullScreenBox);
             AddRow(grid, null, lowLatencyBox);
+            AddRow(grid, null, youTubeBox);
+            AddSection(grid, "Sound");
             AddRow(grid, null, audioBox);
             AddRow(grid, "Sound output:", audioOutputBox);
+            AddSection(grid, "Privacy and recording");
             AddRow(grid, null, pinBox);
             AddRow(grid, null, recordBox);
             AddRow(grid, null, new Label
@@ -88,6 +94,7 @@ namespace UxPlayTray
                 ForeColor = SystemColors.GrayText,
                 Margin = new Padding(3, 0, 3, 8),
             });
+            AddSection(grid, "This PC");
             AddRow(grid, null, startupBox);
             AddRow(grid, null, updatesBox);
             AddRow(grid, "Advanced options:", extraBox);
@@ -120,6 +127,21 @@ namespace UxPlayTray
             Controls.Add(grid);
         }
 
+        /// <summary>A bold heading across both columns, to group the settings.</summary>
+        void AddSection(TableLayoutPanel grid, string title)
+        {
+            int row = grid.RowCount++;
+            var heading = new Label
+            {
+                Text = title,
+                AutoSize = true,
+                Font = new Font(Font, FontStyle.Bold),
+                Margin = new Padding(3, 10, 3, 2),
+            };
+            grid.Controls.Add(heading, 0, row);
+            grid.SetColumnSpan(heading, 2);
+        }
+
         static void AddRow(TableLayoutPanel grid, string label, Control control)
         {
             int row = grid.RowCount++;
@@ -136,6 +158,7 @@ namespace UxPlayTray
             settings.Fps = Settings.FrameRates[frameRateBox.SelectedIndex].Fps;
             settings.FullScreen = fullScreenBox.Checked;
             settings.LowLatency = lowLatencyBox.Checked;
+            settings.YouTubeVideo = youTubeBox.Checked;
             settings.Audio = audioBox.Checked;
             settings.AudioSink = Settings.AudioOutputs[audioOutputBox.SelectedIndex].Sink;
             settings.RequirePin = pinBox.Checked;

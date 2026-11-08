@@ -65,6 +65,7 @@ namespace UxPlayTray
                     case "ontop": s.KeepOnTop = val == "1"; break;
                     case "record": s.Record = val == "1"; break;
                     case "lowlatency": s.LowLatency = val == "1"; break;
+                    case "hls": s.YouTubeVideo = val == "1"; break;
                 }
             }
             // "-vs d3d11videosink" was the manual workaround for full screen before the
@@ -88,6 +89,7 @@ namespace UxPlayTray
             "ontop=" + (s.KeepOnTop ? "1" : "0"),
             "record=" + (s.Record ? "1" : "0"),
             "lowlatency=" + (s.LowLatency ? "1" : "0"),
+            "hls=" + (s.YouTubeVideo ? "1" : "0"),
         };
 
         public void Save(Settings settings)

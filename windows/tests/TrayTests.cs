@@ -387,3 +387,23 @@ public class LowLatencyTests
         Assert.DoesNotContain("-vsync no", s.Build());
     }
 }
+
+public class YouTubeVideoTests
+{
+    [Fact]
+    public void YouTubeVideoAddsHls()
+    {
+        var s = new Settings();
+        Assert.DoesNotContain("-hls", s.Build());
+        s.YouTubeVideo = true;
+        Assert.Contains(" -hls", s.Build());
+        Assert.True(IniSettingsStore.Parse(IniSettingsStore.Format(s)).YouTubeVideo);
+    }
+
+    [Fact]
+    public void OwnHlsOptionWins()
+    {
+        var s = new Settings { YouTubeVideo = true, ExtraArgs = "-hls 2" };
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(s.Build(), "-hls"));
+    }
+}

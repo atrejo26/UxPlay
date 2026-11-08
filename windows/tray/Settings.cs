@@ -42,6 +42,7 @@ namespace UxPlayTray
         public bool KeepOnTop = false;
         public bool Record = false;
         public bool LowLatency = false;
+        public bool YouTubeVideo = false;
 
         /// <summary>The name shown on the iPhone, as uxplay will use it.</summary>
         public string DisplayName => CleanName(Name);

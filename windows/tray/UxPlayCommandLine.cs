@@ -44,6 +44,10 @@ namespace UxPlayTray
             // delay for games, at the cost of sound that can drift slightly from the picture.
             if (s.LowLatency && !s.HasOption("-vsync"))
                 args.Add("-vsync no");
+            // YouTube app videos sent with AirPlay are streamed (HLS) and played by
+            // the PC itself, at full quality, instead of mirroring the iPhone's screen.
+            if (s.YouTubeVideo && !s.HasOption("-hls"))
+                args.Add("-hls");
             if (!s.Audio)
                 args.Add("-as 0");
             else if (s.AudioSink.Length > 0 && !s.HasOption("-as"))
