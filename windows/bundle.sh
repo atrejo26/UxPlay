@@ -39,10 +39,13 @@ shopt -s nullglob
 for soup in "$PREFIX"/bin/libsoup-3.0-*.dll; do
     cp "$soup" "$UX/bin/"
 done
+# Only GLib's TLS backend: the proxy modules (GNOME, libproxy) need GSettings
+# schemas, and without them GLib aborts the program as soon as they load.
 mkdir -p "$UX/lib/gio/modules"
-for module in "$PREFIX"/lib/gio/modules/*.dll; do
+for module in "$PREFIX"/lib/gio/modules/libgiognutls*.dll "$PREFIX"/lib/gio/modules/libgioopenssl*.dll; do
     cp "$module" "$UX/lib/gio/modules/"
 done
+ls "$UX"/lib/gio/modules/*.dll >/dev/null 2>&1 || { echo "GLib's TLS module (glib-networking) is missing" >&2; exit 1; }
 cp "$HERE/uxplay-console.bat" "$UX/"
 cp "$HERE/../LICENSE" "$UX/LICENSE.txt"
 
