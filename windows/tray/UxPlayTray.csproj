@@ -22,6 +22,11 @@
     <EmbeddedResource Include="uxplay.ico" LogicalName="UxPlayTray.uxplay.ico" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(ReleaseTag)' != ''">
+    <!-- set by the release build (-p:ReleaseTag=v1.74-win3); used to tell the user about newer releases -->
+    <AssemblyMetadata Include="ReleaseTag" Value="$(ReleaseTag)" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- lets the project build on machines without the .NET Framework targeting pack -->
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />

@@ -17,6 +17,7 @@ namespace UxPlayTray
         readonly ComboBox audioOutputBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
         readonly CheckBox pinBox = new CheckBox { Text = "Ask for a PIN the first time a new device connects", AutoSize = true };
         readonly CheckBox startupBox = new CheckBox { Text = "Start UxPlay when I sign in to Windows", AutoSize = true };
+        readonly CheckBox updatesBox = new CheckBox { Text = "Tell me when a new version of UxPlay is out", AutoSize = true };
         readonly TextBox extraBox = new TextBox { Width = 260 };
 
         public SettingsForm(Settings settings, IStartupRegistration startup)
@@ -57,6 +58,7 @@ namespace UxPlayTray
             audioBox.CheckedChanged += (s, e) => audioOutputBox.Enabled = audioBox.Checked;
             pinBox.Checked = settings.RequirePin;
             startupBox.Checked = startup.Enabled;
+            updatesBox.Checked = settings.CheckForUpdates;
             extraBox.Text = settings.ExtraArgs;
 
             var grid = new TableLayoutPanel
@@ -74,6 +76,7 @@ namespace UxPlayTray
             AddRow(grid, "Sound output:", audioOutputBox);
             AddRow(grid, null, pinBox);
             AddRow(grid, null, startupBox);
+            AddRow(grid, null, updatesBox);
             AddRow(grid, "Advanced options:", extraBox);
             var hint = new Label
             {
@@ -123,6 +126,7 @@ namespace UxPlayTray
             settings.AudioSink = Settings.AudioOutputs[audioOutputBox.SelectedIndex].Sink;
             settings.RequirePin = pinBox.Checked;
             settings.ExtraArgs = extraBox.Text.Trim();
+            settings.CheckForUpdates = updatesBox.Checked;
             try
             {
                 startup.Enabled = startupBox.Checked;

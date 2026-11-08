@@ -35,7 +35,8 @@ protected your PC"*. Click **More info → Run anyway**.
 Press **Alt+Enter** in the mirror window, or use **Full screen** in the tray
 menu, to switch between a window and borderless full screen without
 disconnecting. Right-click the tray icon for settings (name, quality, sound,
-PIN, start with Windows), restart, the log and a Windows Firewall fix.
+PIN, start with Windows, new-version notice), restart, the log, a test sound
+and a Windows Firewall fix.
 
 With **Ask for a PIN** on, a window pops up with the 4-digit code to type on
 the iPhone the first time it connects; UxPlay remembers the iPhone after that.
@@ -98,6 +99,7 @@ that picks the concrete classes.
 | `IReceiver` / `ReceiverProcess` | Starts and stops `uxplay.exe` with the bundled GStreamer; its log; job object |
 | `GStreamerEnvironment` | Points the bundled GStreamer programs at the bundled plugins |
 | `ISoundTest` / `GStreamerSoundTest` | Plays the test beep through the chosen sound output |
+| `ReleaseTag`, `IUpdateCheck` / `GitHubUpdateCheck` | Compares release tags; asks GitHub for the newest release once per start |
 | `ConnectionMonitor` | Reads uxplay's messages: PIN asked, iPhone connected, iPhone gone |
 | `OutputPatterns` | The uxplay messages it recognises |
 | `Settings` | What the user chose (plain data) |
@@ -117,6 +119,11 @@ New features go in new classes, or new entries in the option tables in
 Files the app keeps on the PC are in `%LOCALAPPDATA%\UxPlay`: `settings.ini`,
 `uxplay.log`, the receiver's key `uxplay.pem` (so the iPhone recognises the PC
 after a restart) and GStreamer's plugin cache.
+
+The only connection the app makes on its own is one request per start to
+`api.github.com` for the newest release's name, when the release build has
+**Tell me when a new version of UxPlay is out** ticked in Settings. Nothing
+about you or your PC is sent.
 
 ## Building it yourself
 

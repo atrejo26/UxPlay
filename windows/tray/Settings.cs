@@ -38,6 +38,7 @@ namespace UxPlayTray
         public string AudioSink = "";
         public bool RequirePin = false;
         public string ExtraArgs = "";
+        public bool CheckForUpdates = true;
 
         /// <summary>The name shown on the iPhone, as uxplay will use it.</summary>
         public string DisplayName => CleanName(Name);

@@ -66,8 +66,12 @@ jobs:
 
       - name: Build tray app
         shell: pwsh
+        env:
+          # the release this build is for, if any (the tray app compares it with the newest release)
+          RELEASE_TAG: ${{ inputs.release_tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || '' }}
         run: |
-          dotnet build windows/tray/UxPlayTray.csproj -c Release -o windows/out/tray
+          dotnet build windows/tray/UxPlayTray.csproj -c Release -o windows/out/tray "-p:ReleaseTag=$env:RELEASE_TAG"
+          if ($LASTEXITCODE -ne 0) { throw "tray app build failed" }
           Copy-Item windows/out/tray/UxPlay.exe, windows/out/tray/UxPlay.exe.config windows/out/UxPlay/
           Copy-Item windows/README.txt windows/out/UxPlay/
 

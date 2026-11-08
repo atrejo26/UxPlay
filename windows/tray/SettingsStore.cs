@@ -61,6 +61,7 @@ namespace UxPlayTray
                     case "audiosink": if (Array.Exists(Settings.AudioOutputs, o => o.Sink == val)) s.AudioSink = val; break;
                     case "pin": s.RequirePin = val == "1"; break;
                     case "extra": s.ExtraArgs = val; break;
+                    case "updates": s.CheckForUpdates = val != "0"; break;
                 }
             }
             // "-vs d3d11videosink" was the manual workaround for full screen before the
@@ -80,6 +81,7 @@ namespace UxPlayTray
             "audiosink=" + s.AudioSink,
             "pin=" + (s.RequirePin ? "1" : "0"),
             "extra=" + s.ExtraArgs,
+            "updates=" + (s.CheckForUpdates ? "1" : "0"),
         };
 
         public void Save(Settings settings)

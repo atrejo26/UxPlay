@@ -18,6 +18,7 @@ namespace UxPlayTray
         public IKeepAwake KeepAwake;
         public IFirewall Firewall;
         public ISoundTest SoundTest;
+        public IUpdateCheck UpdateCheck;
     }
 
     /// <summary>
@@ -35,6 +36,7 @@ namespace UxPlayTray
         readonly IKeepAwake keepAwake;
         readonly IFirewall firewall;
         readonly ISoundTest soundTest;
+        readonly IUpdateCheck updateCheck;
         readonly ConnectionMonitor connection = new ConnectionMonitor();
 
         readonly NotifyIcon tray;
@@ -47,6 +49,7 @@ namespace UxPlayTray
         readonly Settings settings;
         SettingsForm settingsForm;
         PinForm pinForm;
+        string balloonLink;   // opened when the balloon on show is clicked
         bool restartPending;  // apply changed settings once nothing is being mirrored
 
         public TrayApp(TrayServices services)
@@ -58,6 +61,7 @@ namespace UxPlayTray
             keepAwake = services.KeepAwake;
             firewall = services.Firewall;
             soundTest = services.SoundTest;
+            updateCheck = services.UpdateCheck;
             settings = store.Load();
 
             ui = new Control();
@@ -113,6 +117,8 @@ namespace UxPlayTray
                 Visible = true,
             };
             tray.DoubleClick += (s, e) => ShowHowToConnect();
+            tray.BalloonTipClicked += (s, e) => { if (balloonLink != null) Open(balloonLink); };
+            tray.BalloonTipClosed += (s, e) => balloonLink = null;
 
             // Only runs while a changed setting waits for mirroring to end.
             pendingRestartTimer = new System.Windows.Forms.Timer { Interval = 3000 };
@@ -133,9 +139,39 @@ namespace UxPlayTray
             }
 
             if (StartReceiver())
-                tray.ShowBalloonTip(8000, "UxPlay is ready",
+                ShowBalloon(8000, "UxPlay is ready",
                     "On your iPhone: open Control Center, tap Screen Mirroring, then choose \"" +
                     settings.DisplayName + "\".", ToolTipIcon.Info);
+            _ = CheckForUpdate();
+        }
+
+        void ShowBalloon(int timeout, string title, string text, ToolTipIcon icon, string link = null)
+        {
+            balloonLink = link;
+            tray.ShowBalloonTip(timeout, title, text, icon);
+        }
+
+        /// <summary>
+        /// Once per start, a minute in so it doesn't slow sign-in: tells the user when a
+        /// newer release is out. Only for release builds, and only when allowed in Settings.
+        /// </summary>
+        async System.Threading.Tasks.Task CheckForUpdate()
+        {
+            string current = ReleaseTag.Current;
+            if (current == null || !settings.CheckForUpdates)
+                return;
+            await System.Threading.Tasks.Task.Delay(TimeSpan.FromMinutes(1));
+            if (!settings.CheckForUpdates)
+                return;
+            string latest = await updateCheck.LatestReleaseTagAsync();
+            if (latest == null || !ReleaseTag.IsNewer(latest, current))
+                return;
+            // don't cover the PIN or a connection message while someone is mirroring
+            if (pinForm != null || connection.IsConnected)
+                return;
+            ShowBalloon(15000, "A new version of UxPlay is out",
+                latest + " is ready to download (you have " + current + "). Click here to get it.",
+                ToolTipIcon.Info, ReleasesUrl + "/tag/" + latest);
         }
 
         void OnUi(Action action)
@@ -236,7 +272,7 @@ namespace UxPlayTray
             keepAwake.Set(true);  // don't let the screen turn off while mirroring
             SetStatus("Connected: " + device);
             if (isNew)
-                tray.ShowBalloonTip(3000, "UxPlay", device + " is connecting...", ToolTipIcon.None);
+                ShowBalloon(3000, "UxPlay", device + " is connecting...", ToolTipIcon.None);
         }
 
         void OnDisconnected()
@@ -483,7 +519,7 @@ namespace UxPlayTray
         void ShowAbout()
         {
             var answer = MessageBox.Show(
-                "UxPlay for Windows, version " + Version + "\n" +
+                "UxPlay for Windows, version " + Version + (ReleaseTag.Current != null ? " (" + ReleaseTag.Current + ")" : "") + "\n" +
                 "AirPlay receiver based on UxPlay 1.74 (GPL v3).\n\n" +
                 "Open the download page to check for a newer version?",
                 "About UxPlay", MessageBoxButtons.YesNo, MessageBoxIcon.Information);

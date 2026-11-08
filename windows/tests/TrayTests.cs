@@ -285,3 +285,38 @@ public class SoundTestTests
         Assert.Equal(SoundTestResult.Unavailable, await test.PlayAsync(""));
     }
 }
+
+public class ReleaseTagTests
+{
+    [Theory]
+    [InlineData("v1.74-win3", "v1.74-win2", true)]
+    [InlineData("v1.74-win10", "v1.74-win9", true)]
+    [InlineData("v1.75-win1", "v1.74-win9", true)]
+    [InlineData("v1.74-win3", "v1.74-win3-beta", true)]   // the finished release of this beta
+    [InlineData("v1.74-win2", "v1.74-win2", false)]
+    [InlineData("v1.74-win2", "v1.74-win3-beta", false)]  // a beta is newer than the last release
+    [InlineData("v1.74-win3-beta", "v1.74-win3", false)]
+    [InlineData("v1.73-win9", "v1.74-win1", false)]
+    [InlineData("nightly", "v1.74-win2", false)]
+    [InlineData("v1.74-win3", null, false)]
+    public void ComparesReleases(string latest, string current, bool newer)
+    {
+        Assert.Equal(newer, ReleaseTag.IsNewer(latest, current));
+    }
+
+    [Fact]
+    public void ReadsTagFromGitHubJson()
+    {
+        Assert.Equal("v1.74-win2", GitHubUpdateCheck.ParseTag("{\"url\":\"x\",\"tag_name\": \"v1.74-win2\",\"name\":\"y\"}"));
+        Assert.Null(GitHubUpdateCheck.ParseTag("{\"message\":\"API rate limit exceeded\"}"));
+        Assert.Null(GitHubUpdateCheck.ParseTag(null));
+    }
+
+    [Fact]
+    public void UpdatesSettingIsSaved()
+    {
+        var s = new Settings { CheckForUpdates = false };
+        Assert.False(IniSettingsStore.Parse(IniSettingsStore.Format(s)).CheckForUpdates);
+        Assert.True(IniSettingsStore.Parse(new string[0]).CheckForUpdates);
+    }
+}
