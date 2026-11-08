@@ -133,8 +133,9 @@ namespace UxPlayTray
                 Visible = true,
             };
             tray.DoubleClick += (s, e) => ShowHowToConnect();
+            // Every balloon sets its own link (or none), so a late "closed" from a
+            // replaced balloon can't take the link from the one on show.
             tray.BalloonTipClicked += (s, e) => { if (balloonLink != null) Open(balloonLink); };
-            tray.BalloonTipClosed += (s, e) => balloonLink = null;
 
             // Only runs while a changed setting waits for mirroring to end.
             pendingRestartTimer = new System.Windows.Forms.Timer { Interval = 3000 };
@@ -385,8 +386,9 @@ namespace UxPlayTray
             settings.KeepOnTop = !settings.KeepOnTop;
             onTopItem.Checked = settings.KeepOnTop;
             SaveSettings();
-            if (receiver.IsRunning)
-                mirrorWindow.SetTopMost(receiver.ProcessId, settings.KeepOnTop);
+            if (receiver.IsRunning && !mirrorWindow.SetTopMost(receiver.ProcessId, settings.KeepOnTop) &&
+                connection.IsConnected)
+                WatchForMirrorWindow();  // connected, but its window isn't open yet
         }
 
         /// <summary>The mirror window opens a moment after the iPhone connects: wait up to 30 s for it.</summary>
