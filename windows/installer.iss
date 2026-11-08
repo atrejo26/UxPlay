@@ -42,6 +42,11 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Shortcuts:"
 Name: "startup"; Description: "Start UxPlay &automatically when I sign in to Windows"; GroupDescription: "Start-up:"; Flags: unchecked
 
+[InstallDelete]
+; an update replaces the whole receiver folder, so plugins dropped from a newer
+; GStreamer don't linger and get loaded with the new DLLs
+Type: filesandordirs; Name: "{app}\uxplay"
+
 [Files]
 Source: "out\UxPlay\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 

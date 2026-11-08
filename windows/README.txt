@@ -25,7 +25,9 @@ Right-click the UxPlay icon for:
   - Full screen on or off (borderless). You can also press Alt+Enter
     in the mirror window to switch in and out of full screen.
   - Settings: the name shown on the iPhone, quality, sound, a PIN code,
-    and starting UxPlay when you sign in to Windows
+    and starting UxPlay when you sign in to Windows. With "Ask for a PIN"
+    on, a window shows the 4-digit code to type on the iPhone the first
+    time it connects.
   - Troubleshooting: Windows Firewall fix and the log
 
 Smoother mirroring

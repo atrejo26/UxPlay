@@ -40,9 +40,18 @@ namespace UxPlayTray
         public static Settings Load()
         {
             var s = new Settings();
-            if (!File.Exists(FilePath))
-                return s;
-            foreach (var line in File.ReadAllLines(FilePath, Encoding.UTF8))
+            string[] lines;
+            try
+            {
+                if (!File.Exists(FilePath))
+                    return s;
+                lines = File.ReadAllLines(FilePath, Encoding.UTF8);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                return s;  // unreadable: start with the defaults
+            }
+            foreach (var line in lines)
             {
                 int eq = line.IndexOf('=');
                 if (eq <= 0)

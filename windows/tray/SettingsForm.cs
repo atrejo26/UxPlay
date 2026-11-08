@@ -32,8 +32,7 @@ namespace UxPlayTray
             AutoScaleMode = AutoScaleMode.Dpi;
             Font = SystemFonts.MessageBoxFont;
             Padding = new Padding(12);
-            using (var stream = typeof(SettingsForm).Assembly.GetManifestResourceStream("UxPlayTray.uxplay.ico"))
-                Icon = new Icon(stream);
+            Icon = TrayApp.AppIcon;
 
             foreach (var r in Settings.Resolutions)
                 resolutionBox.Items.Add(r.Label);

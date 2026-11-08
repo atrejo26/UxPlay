@@ -22,6 +22,14 @@ namespace UxPlayTray
         static readonly string LogPath = Path.Combine(Settings.DataDir, "uxplay.log");
 
         static readonly Regex ConnectRequest = new Regex(@"connection request from (.+?) \((.*?)\) with deviceID");
+        // uxplay asks the iPhone for a code and prints it (pairing with "Ask for a PIN").
+        static readonly Regex PinRequest = new Regex(@"CLIENT MUST NOW ENTER PIN = ""(\d{4})""");
+        // Network connections from iPhones, to tell when the last one has gone.
+        static readonly Regex SocketOpened = new Regex(@"^Accepted IPv[46] client on socket (\d+)");
+        static readonly Regex SocketClosed = new Regex(@"^Connection closed on socket (\d+)");
+
+        /// <summary>The app icon, shared by the tray and every window.</summary>
+        internal static readonly Icon AppIcon = LoadIcon(null);
 
         readonly NotifyIcon tray;
         readonly Control ui;  // marshals process events onto the UI thread
@@ -33,11 +41,14 @@ namespace UxPlayTray
 
         Settings settings = Settings.Load();
         Process server;
-        StreamWriter log;
+        LogFile log;
         bool stopping;
         DateTime startedAt;
         SettingsForm settingsForm;
+        PinForm pinForm;
         bool restartPending;  // apply changed settings once nothing is being mirrored
+        bool connected;       // an iPhone is mirroring or playing sound
+        readonly System.Collections.Generic.HashSet<int> openSockets = new System.Collections.Generic.HashSet<int>();
 
         public TrayApp()
         {
@@ -55,6 +66,9 @@ namespace UxPlayTray
             };
 
             var menu = new ContextMenuStrip();
+            // Alt+Enter in the mirror window changes full screen without telling us,
+            // so show the window's real state whenever the menu opens.
+            menu.Opening += (s, e) => fullScreenItem.Checked = CurrentFullScreen();
             menu.Items.AddRange(new ToolStripItem[]
             {
                 statusItem,
@@ -74,16 +88,16 @@ namespace UxPlayTray
 
             tray = new NotifyIcon
             {
-                Icon = LoadIcon(),
+                Icon = LoadIcon(SystemInformation.SmallIconSize),
                 Text = "UxPlay",
                 ContextMenuStrip = menu,
                 Visible = true,
             };
             tray.DoubleClick += (s, e) => ShowHowToConnect();
 
+            // Only runs while a changed setting waits for mirroring to end.
             pendingRestartTimer = new System.Windows.Forms.Timer { Interval = 3000 };
             pendingRestartTimer.Tick += (s, e) => ApplyPendingRestart();
-            pendingRestartTimer.Start();
 
             // A second launch of UxPlay.exe signals this event instead of starting another copy.
             showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, Program.ShowEventName);
@@ -106,10 +120,10 @@ namespace UxPlayTray
                     Settings.CleanName(settings.Name) + "\".", ToolTipIcon.Info);
         }
 
-        static Icon LoadIcon()
+        static Icon LoadIcon(Size? size)
         {
             using var stream = typeof(TrayApp).Assembly.GetManifestResourceStream("UxPlayTray.uxplay.ico");
-            return new Icon(stream, SystemInformation.SmallIconSize);
+            return size.HasValue ? new Icon(stream, size.Value) : new Icon(stream);
         }
 
         void OnUi(Action action)
@@ -120,11 +134,10 @@ namespace UxPlayTray
 
         // ---- uxplay.exe process -------------------------------------------------
 
-        bool StartServer()
+        bool StartServer(bool keepLog = false)
         {
             if (server != null)
                 return true;
-            Directory.CreateDirectory(Settings.DataDir);
 
             var psi = new ProcessStartInfo(ServerExe, settings.BuildArguments())
             {
@@ -140,11 +153,13 @@ namespace UxPlayTray
 
             try
             {
-                log = new StreamWriter(LogPath, false, new UTF8Encoding(false)) { AutoFlush = true };
-                log.WriteLine("> uxplay.exe " + psi.Arguments);
+                Directory.CreateDirectory(Settings.DataDir);
+                var processLog = new LogFile(LogPath, "> uxplay.exe " + psi.Arguments, keepLog);
+                log = processLog;
                 var p = new Process { StartInfo = psi, EnableRaisingEvents = true };
-                p.OutputDataReceived += (s, e) => OnOutput(e.Data);
-                p.ErrorDataReceived += (s, e) => OnOutput(e.Data);
+                // Each copy of uxplay.exe writes to its own log, even after a restart.
+                p.OutputDataReceived += (s, e) => OnOutput(processLog, e.Data);
+                p.ErrorDataReceived += (s, e) => OnOutput(processLog, e.Data);
                 p.Exited += (s, e) => OnUi(() => OnServerExited(p));
                 p.Start();
                 job.Add(p);  // uxplay.exe is closed automatically if this app goes away
@@ -153,7 +168,7 @@ namespace UxPlayTray
                 server = p;
                 startedAt = DateTime.Now;
                 stopping = false;
-                restartPending = false;
+                SetRestartPending(false);
                 SetStatus("Ready - waiting for iPhone");
                 return true;
             }
@@ -184,22 +199,77 @@ namespace UxPlayTray
             env["HOME"] = Settings.DataDir;
         }
 
-        void OnOutput(string line)
+        void OnOutput(LogFile processLog, string line)
         {
             if (line == null)
                 return;
-            try { log?.WriteLine(line); } catch (ObjectDisposedException) { }
+            processLog.WriteLine(line);
 
-            var m = ConnectRequest.Match(line);
-            if (m.Success)
+            Match m;
+            if ((m = PinRequest.Match(line)).Success)
+            {
+                string pin = m.Groups[1].Value;
+                OnUi(() => ShowPin(pin));
+            }
+            else if ((m = ConnectRequest.Match(line)).Success)
             {
                 string device = m.Groups[1].Value.Trim();
+                OnUi(() => OnConnected(device));
+            }
+            else if ((m = SocketOpened.Match(line)).Success)
+            {
+                int socket = int.Parse(m.Groups[1].Value);
+                OnUi(() => openSockets.Add(socket));
+            }
+            else if ((m = SocketClosed.Match(line)).Success)
+            {
+                int socket = int.Parse(m.Groups[1].Value);
                 OnUi(() =>
                 {
-                    SetStatus("Connected: " + device);
-                    tray.ShowBalloonTip(3000, "UxPlay", device + " is connecting...", ToolTipIcon.None);
+                    openSockets.Remove(socket);
+                    if (openSockets.Count == 0)
+                        OnDisconnected();
                 });
             }
+        }
+
+        void OnConnected(string device)
+        {
+            if (server == null)
+                return;
+            ClosePin();  // paired: the code is no longer needed
+            bool wasConnected = connected;
+            connected = true;
+            KeepAwake.Set(true);  // don't let the screen turn off while mirroring
+            SetStatus("Connected: " + device);
+            if (!wasConnected)
+                tray.ShowBalloonTip(3000, "UxPlay", device + " is connecting...", ToolTipIcon.None);
+        }
+
+        void OnDisconnected()
+        {
+            if (!connected)
+                return;
+            connected = false;
+            KeepAwake.Set(false);
+            if (server != null)
+                SetStatus("Ready - waiting for iPhone");
+        }
+
+        void ShowPin(string pin)
+        {
+            if (server == null)
+                return;
+            if (pinForm == null || pinForm.IsDisposed)
+                pinForm = new PinForm();
+            pinForm.ShowPin(pin);
+        }
+
+        void ClosePin()
+        {
+            if (pinForm != null && !pinForm.IsDisposed)
+                pinForm.Close();
+            pinForm = null;
         }
 
         void OnServerExited(Process p)
@@ -210,6 +280,7 @@ namespace UxPlayTray
             int code = SafeExitCode(p);
             p.Dispose();
             CloseLog();
+            ResetConnection();
 
             if (stopping)
             {
@@ -221,7 +292,13 @@ namespace UxPlayTray
             // otherwise something is wrong with the setup, so tell the user.
             if ((DateTime.Now - startedAt).TotalSeconds > 20)
             {
-                StartServer();
+                // Keep the log of the copy that stopped, for troubleshooting.
+                try
+                {
+                    File.AppendAllText(LogPath, "--- uxplay.exe stopped unexpectedly (exit code " + code + "); restarting ---\r\n");
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                StartServer(keepLog: true);
                 return;
             }
             SetStatus("Stopped (error)");
@@ -256,7 +333,18 @@ namespace UxPlayTray
             server = null;
             p.Dispose();
             CloseLog();
+            ResetConnection();
             SetStatus("Stopped");
+        }
+
+        /// <summary>Forgets the connection state of a uxplay.exe that has gone.</summary>
+        void ResetConnection()
+        {
+            ClosePin();
+            openSockets.Clear();
+            connected = false;
+            KeepAwake.Set(false);
+            SetRestartPending(false);
         }
 
         void RestartServer()
@@ -277,7 +365,7 @@ namespace UxPlayTray
         {
             var l = log;
             log = null;
-            try { l?.Dispose(); } catch (IOException) { }
+            l?.Dispose();
         }
 
         /// <summary>Ends copies of the bundled uxplay.exe left behind by a crash.</summary>
@@ -329,25 +417,52 @@ namespace UxPlayTray
                 "UxPlay", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
+        /// <summary>Full screen state of the open mirror window, or the setting when there is none.</summary>
+        bool CurrentFullScreen()
+        {
+            if (server != null && !settings.HasOwnVideoSink)
+                return MirrorWindow.IsFullScreen(server.Id) ?? settings.FullScreen;
+            return settings.FullScreen;
+        }
+
         void ToggleFullScreen()
         {
-            settings.FullScreen = !settings.FullScreen;
+            settings.FullScreen = !CurrentFullScreen();
             fullScreenItem.Checked = settings.FullScreen;
-            settings.Save();
+            SaveSettings();
             if (server == null)
                 return;
             // While mirroring, switch the open window right away so the connection is
             // kept; uxplay picks up the saved setting once nothing is being mirrored.
             if (!settings.HasOwnVideoSink && MirrorWindow.SetFullScreen(server.Id, settings.FullScreen))
-                restartPending = true;
+                SetRestartPending(true);
             else
                 RestartServer();
         }
 
+        void SetRestartPending(bool pending)
+        {
+            restartPending = pending;
+            pendingRestartTimer.Enabled = pending;
+        }
+
         void ApplyPendingRestart()
         {
-            if (restartPending && server != null && !MirrorWindow.Exists(server.Id))
+            if (restartPending && server != null && !connected && !MirrorWindow.Exists(server.Id))
                 RestartServer();
+        }
+
+        void SaveSettings()
+        {
+            try
+            {
+                settings.Save();
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                MessageBox.Show("Could not save the settings:\n" + ex.Message, "UxPlay",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         void ShowSettings()
@@ -357,13 +472,17 @@ namespace UxPlayTray
                 settingsForm.Activate();
                 return;
             }
+            string before = settings.BuildArguments();
             using (settingsForm = new SettingsForm(settings))
             {
                 if (settingsForm.ShowDialog() == DialogResult.OK)
                 {
-                    settings.Save();
+                    SaveSettings();
                     fullScreenItem.Checked = settings.FullScreen;
-                    RestartServer();
+                    // Restarting disconnects the iPhone, so only do it when something
+                    // uxplay uses has changed (or it isn't running).
+                    if (server == null || settings.BuildArguments() != before)
+                        RestartServer();
                 }
             }
             settingsForm = null;
@@ -377,11 +496,20 @@ namespace UxPlayTray
                 return;
             }
             // Copy it so Notepad can open it while uxplay keeps writing.
-            string copy = Path.Combine(Path.GetTempPath(), "uxplay-log.txt");
-            using (var src = new FileStream(LogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-            using (var dst = File.Create(copy))
-                src.CopyTo(dst);
-            Process.Start("notepad.exe", "\"" + copy + "\"")?.Dispose();
+            try
+            {
+                string copy = Path.Combine(Path.GetTempPath(), "uxplay-log.txt");
+                using (var src = new FileStream(LogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                using (var dst = File.Create(copy))
+                    src.CopyTo(dst);
+                Process.Start("notepad.exe", "\"" + copy + "\"")?.Dispose();
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException ||
+                                       ex is System.ComponentModel.Win32Exception)
+            {
+                MessageBox.Show("Could not open the log:\n" + ex.Message + "\n\nIt is saved in:\n" + LogPath,
+                    "UxPlay", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         static void FixFirewall()
@@ -426,10 +554,12 @@ namespace UxPlayTray
             if (disposing)
             {
                 StopServer();
+                ClosePin();
                 pendingRestartTimer.Dispose();
                 showWait.Unregister(null);
                 showEvent.Dispose();
                 tray.Visible = false;
+                tray.Icon?.Dispose();
                 tray.Dispose();
                 ui.Dispose();
                 job.Dispose();

@@ -5,6 +5,10 @@ Mirror your iPhone or iPad screen to your Windows PC with AirPlay. No MSYS2, Bon
 ### What's new
 - **Borderless full screen that you can switch at any time.** Press **Alt+Enter** in the mirror window, or use **Full screen** in the tray menu, without disconnecting your iPhone. Settings has an option to start in full screen.
 - **Smoother video:** mirroring now runs at 60 fps by default (UxPlay on its own uses 30). Settings → **Smoothness** has a 30 fps option for older PCs or weak Wi-Fi.
+- **PIN codes now appear on screen.** With **Ask for a PIN** turned on, a window shows the 4-digit code to type on your iPhone. Before, the code was hidden and couldn't be read.
+- **The screen stays on while you mirror**, and the PC can sleep normally when nothing is connected.
+- **Lighter on your PC:** changing a setting that doesn't affect mirroring no longer disconnects your iPhone, nothing runs in the background while idle, and the log can't grow without limit.
+- Fixes: the tray shows when your iPhone disconnects, the Full screen tick matches the window after Alt+Enter, the tray icon no longer lingers after Quit, and the log of a crash is kept.
 
 ### Download
 - **UxPlay-Setup.exe**: installer (recommended). Adds Start menu and desktop shortcuts, sets up Windows Firewall, and can start UxPlay when you sign in.
