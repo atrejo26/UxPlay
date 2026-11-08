@@ -1,0 +1,26 @@
+## UxPlay 1.74 for Windows
+
+Mirror your iPhone or iPad screen to your Windows PC with AirPlay. No MSYS2, Bonjour or compiling needed.
+
+### What's new
+- **Borderless full screen that you can switch at any time.** Press **Alt+Enter** in the mirror window, or use **Full screen** in the tray menu, without disconnecting your iPhone. Settings has an option to start in full screen.
+- **Smoother video:** mirroring now runs at 60 fps by default (UxPlay on its own uses 30). Settings → **Smoothness** has a 30 fps option for older PCs or weak Wi-Fi.
+
+### Download
+- **UxPlay-Setup.exe**: installer (recommended). Adds Start menu and desktop shortcuts, sets up Windows Firewall, and can start UxPlay when you sign in.
+- **UxPlay-Windows-portable.zip**: no install needed. Unzip it anywhere and double-click `UxPlay.exe`.
+
+### How to use
+1. Start UxPlay. A blue icon appears near the clock.
+2. Connect your iPhone and PC to the same Wi-Fi network.
+3. On your iPhone, open Control Center, tap **Screen Mirroring**, and choose your PC.
+
+Right-click the tray icon for full screen, settings (name, quality, smoothness, sound, PIN, start with Windows), restart, and troubleshooting.
+
+### Notes
+- Windows 10 or 11, 64-bit (Intel/AMD).
+- The installer isn't code-signed, so Windows SmartScreen may warn you. Click **More info → Run anyway**.
+- The firewall rule is for Windows Firewall. If you use another firewall or security suite (ESET, Norton and so on), allow `uxplay.exe` there for both TCP and UDP. Sound uses UDP.
+- On public Wi-Fi, quit UxPlay or turn on **Ask for a PIN** in Settings.
+
+Based on [UxPlay](https://github.com/FDH2/UxPlay) 1.74 (GPL v3).

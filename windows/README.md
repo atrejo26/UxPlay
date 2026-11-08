@@ -15,9 +15,12 @@ GitHub builds it automatically with the **Windows App** workflow
   under *Artifacts*. Unzip it and run `UxPlay-Setup.exe`.
 - **Portable:** download **UxPlay-Windows-portable** from the same run, unzip
   it anywhere and double-click `UxPlay.exe`.
-- **Releases:** pushing a tag that starts with `v` (for example
-  `git tag v1.74-win1 && git push origin v1.74-win1`) also publishes both
-  files on the repository's **Releases** page.
+- **Releases:** to publish both files on the repository's **Releases** page,
+  open **Actions → Windows App → Run workflow**, choose `master`, enter a new
+  tag such as `v1.74-win2` and click **Run workflow**. The release notes come
+  from `windows/RELEASE_NOTES.md`, so update its "What's new" section first.
+  Pushing a tag that starts with `v`, or creating a release on GitHub, also
+  works; a release created by hand keeps the notes typed there.
 
 The installer is not code-signed, so Windows SmartScreen may say *"Windows
 protected your PC"*. Click **More info → Run anyway**.
@@ -54,6 +57,7 @@ turn on **Ask for a PIN** in Settings.
 | `tray/` | `UxPlay.exe`, the system-tray app (C#, .NET Framework 4.8, built into Windows 10/11). It runs `uxplay.exe` hidden, with the options from its Settings window. |
 | `bundle.sh` | Run in MSYS2 after building: copies `uxplay.exe`, its DLLs and the GStreamer plugins into one self-contained folder. |
 | `uxplay-console.bat` | Runs the bundled `uxplay.exe` in a console window for troubleshooting. |
+| `RELEASE_NOTES.md` | Notes used for releases published from the Actions tab. |
 | `installer.iss` | Inno Setup script for `UxPlay-Setup.exe`: shortcuts, firewall rule, optional start at sign-in, uninstaller. |
 | `README.txt` | Quick-start guide shipped inside the app folder. |
 | `tools/make_icon.py` | Draws `tray/uxplay.ico` (needs Pillow). |
