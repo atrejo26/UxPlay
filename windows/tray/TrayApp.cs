@@ -277,6 +277,9 @@ namespace UxPlayTray
             if (p != server)
                 return;
             server = null;
+            // Exited can arrive before the last lines of output have been read, and those
+            // usually say why it stopped: wait for them before closing the log.
+            try { p.WaitForExit(); } catch (InvalidOperationException) { }
             int code = SafeExitCode(p);
             p.Dispose();
             CloseLog();
