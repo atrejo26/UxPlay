@@ -45,7 +45,7 @@ namespace UxPlayTray
         readonly NotifyIcon tray;
         readonly Icon readyIcon, connectedIcon, stoppedIcon;
         readonly Control ui;  // marshals receiver events onto the UI thread
-        readonly ToolStripMenuItem statusItem, startStopItem, restartItem, fullScreenItem, onTopItem, soundTestItem, recordingsItem;
+        readonly ToolStripMenuItem statusItem, startStopItem, restartItem, fullScreenItem, onTopItem, soundTestItem, recordingsItem, screenshotItem;
         readonly EventWaitHandle showEvent;
         readonly RegisteredWaitHandle showWait;
         readonly System.Windows.Forms.Timer pendingRestartTimer;
@@ -98,6 +98,10 @@ namespace UxPlayTray
             {
                 Visible = settings.Record,
             };
+            screenshotItem = new ToolStripMenuItem("Save a screenshot", null, async (s, e) => await SaveScreenshot())
+            {
+                Enabled = false,  // until an iPhone is mirroring
+            };
             soundTestItem = new ToolStripMenuItem("Play a test sound", null, async (s, e) => await TestSound());
 
             var menu = new ContextMenuStrip();
@@ -113,6 +117,7 @@ namespace UxPlayTray
                 restartItem,
                 fullScreenItem,
                 onTopItem,
+                screenshotItem,
                 new ToolStripMenuItem("Settings...", null, (s, e) => ShowSettings()),
                 recordingsItem,
                 new ToolStripSeparator(),
@@ -477,6 +482,7 @@ namespace UxPlayTray
             string tip = "UxPlay - " + text;
             tray.Text = tip.Length > 63 ? tip.Substring(0, 63) : tip;  // NotifyIcon limit
             startStopItem.Text = receiver.IsRunning ? "Stop" : "Start";
+            screenshotItem.Enabled = receiver.IsRunning && connection.IsConnected;
             var icon = !receiver.IsRunning ? stoppedIcon : connection.IsConnected ? connectedIcon : readyIcon;
             if (tray.Icon != icon)
                 tray.Icon = icon;
@@ -567,6 +573,31 @@ namespace UxPlayTray
         }
 
         /// <summary>Opens a folder or web page with its default program.</summary>
+        async System.Threading.Tasks.Task SaveScreenshot()
+        {
+            await System.Threading.Tasks.Task.Delay(300);  // let the menu close so it isn't in the picture
+            string path = null;
+            bool saved;
+            try
+            {
+                Directory.CreateDirectory(AppPaths.ScreenshotsDir);
+                path = ScreenshotName.Next(AppPaths.ScreenshotsDir, DateTime.Now, File.Exists);
+                saved = receiver.IsRunning && mirrorWindow.SaveScreenshot(receiver.ProcessId, path);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException ||
+                                       ex is System.Runtime.InteropServices.ExternalException || ex is ArgumentException)
+            {
+                ShowBalloon(8000, "UxPlay couldn't save the screenshot", ex.Message, ToolTipIcon.Warning);
+                return;
+            }
+            if (saved)
+                ShowBalloon(5000, "Screenshot saved", Path.GetFileName(path) + " is in " + AppPaths.ScreenshotsDir +
+                    ". Click to open the folder.", ToolTipIcon.Info, AppPaths.ScreenshotsDir);
+            else
+                ShowBalloon(8000, "UxPlay couldn't save the screenshot",
+                    "The mirror window isn't open yet.", ToolTipIcon.Warning);
+        }
+
         static void Open(string target)
         {
             try

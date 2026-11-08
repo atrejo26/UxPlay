@@ -41,6 +41,7 @@
     <Compile Include="../tray/RestartPolicy.cs" Link="RestartPolicy.cs" />
     <Compile Include="../tray/LogFile.cs" Link="LogFile.cs" />
     <Compile Include="../tray/IMirrorWindow.cs" Link="IMirrorWindow.cs" />
+    <Compile Include="../tray/ScreenshotName.cs" Link="ScreenshotName.cs" />
   </ItemGroup>
 
   <ItemGroup>

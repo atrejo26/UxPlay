@@ -22,5 +22,9 @@ namespace UxPlayTray
         /// <summary>Videos\UxPlay: recordings of mirroring sessions, when turned on in Settings.</summary>
         public static readonly string RecordingsDir =
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "UxPlay");
+
+        /// <summary>Pictures\UxPlay: screenshots from the tray menu.</summary>
+        public static readonly string ScreenshotsDir =
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "UxPlay");
     }
 }

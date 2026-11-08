@@ -585,3 +585,33 @@ public class LogFileEdgeCases
         System.IO.File.Delete(path);
     }
 }
+
+public class ScreenshotNameEdgeCases
+{
+    [Fact]
+    public void SameNameWhateverTheLanguageOfWindows()
+    {
+        var before = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            // Arabic uses another calendar and digits; the file name must not change
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("ar-SA");
+            string path = ScreenshotName.Next("p", new DateTime(2026, 1, 2, 3, 4, 5), _ => false);
+            Assert.Equal(System.IO.Path.Combine("p", "UxPlay 2026-01-02 03-04-05.png"), path);
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = before;
+        }
+    }
+
+    [Fact]
+    public void ManyInTheSameSecondAllGetTheirOwnName()
+    {
+        var taken = new System.Collections.Generic.HashSet<string>();
+        var when = new DateTime(2026, 1, 2, 3, 4, 5);
+        for (int i = 0; i < 500; i++)
+            Assert.True(taken.Add(ScreenshotName.Next("p", when, taken.Contains)));
+        Assert.Equal(500, taken.Count);
+    }
+}

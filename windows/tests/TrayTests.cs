@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -556,6 +557,7 @@ sealed class FakeMirrorWindow : IMirrorWindow
     public bool Exists(int processId) => Tries >= OpensAfter;
     public bool? IsFullScreen(int processId) => null;
     public bool SetFullScreen(int processId, bool fullScreen) => false;
+    public bool SaveScreenshot(int processId, string path) => false;
     public bool SetTopMost(int processId, bool topMost)
     {
         if (++Tries <= OpensAfter)
@@ -636,5 +638,29 @@ public class LogFileTests
         using (var log = new LogFile(path, "run 2", append: false)) { }
         Assert.Equal(new[] { "run 2" }, File.ReadAllLines(path));
         File.Delete(path);
+    }
+}
+
+public class ScreenshotNameTests
+{
+    static readonly DateTime When = new DateTime(2026, 11, 8, 7, 5, 9);
+
+    [Fact]
+    public void NamedByDateAndTime()
+    {
+        string path = ScreenshotName.Next("pics", When, _ => false);
+        Assert.Equal(Path.Combine("pics", "UxPlay 2026-11-08 07-05-09.png"), path);
+    }
+
+    [Fact]
+    public void NeverOverwritesAnEarlierOne()
+    {
+        var taken = new HashSet<string>
+        {
+            Path.Combine("pics", "UxPlay 2026-11-08 07-05-09.png"),
+            Path.Combine("pics", "UxPlay 2026-11-08 07-05-09 (2).png"),
+        };
+        string path = ScreenshotName.Next("pics", When, taken.Contains);
+        Assert.Equal(Path.Combine("pics", "UxPlay 2026-11-08 07-05-09 (3).png"), path);
     }
 }

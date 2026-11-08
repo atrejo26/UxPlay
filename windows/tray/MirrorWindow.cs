@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -61,6 +63,46 @@ namespace UxPlayTray
             return windows.Count > 0;
         }
 
+        public bool SaveScreenshot(int processId, string path)
+        {
+            var windows = Find(processId);
+            if (windows.Count == 0)
+                return false;
+            IntPtr hwnd = windows[0];
+            if (!GetClientRect(hwnd, out RECT client) || client.Right <= 0 || client.Bottom <= 0)
+                return false;
+            using (var bitmap = new Bitmap(client.Right, client.Bottom, PixelFormat.Format32bppRgb))
+            {
+                using (var g = Graphics.FromImage(bitmap))
+                {
+                    // The Direct3D picture is drawn by the GPU: PrintWindow can fetch it only
+                    // with PW_RENDERFULLCONTENT. If it still comes back black, copy the screen.
+                    IntPtr hdc = g.GetHdc();
+                    bool printed = PrintWindow(hwnd, hdc, PW_CLIENTONLY | PW_RENDERFULLCONTENT);
+                    g.ReleaseHdc(hdc);
+                    if (!printed || IsBlack(bitmap))
+                    {
+                        var origin = new POINT();
+                        if (!ClientToScreen(hwnd, ref origin))
+                            return false;
+                        g.CopyFromScreen(origin.X, origin.Y, 0, 0, bitmap.Size);
+                    }
+                }
+                bitmap.Save(path, ImageFormat.Png);
+            }
+            return true;
+        }
+
+        /// <summary>A quick look at a grid of pixels: all black means nothing was captured.</summary>
+        static bool IsBlack(Bitmap bitmap)
+        {
+            for (int y = 1; y < 8; y++)
+                for (int x = 1; x < 8; x++)
+                    if ((bitmap.GetPixel(bitmap.Width * x / 8, bitmap.Height * y / 8).ToArgb() & 0xFFFFFF) != 0)
+                        return false;
+            return true;
+        }
+
         /// <summary>A window covering its whole monitor is in full screen.</summary>
         static bool IsFullScreen(IntPtr hwnd)
         {
@@ -92,6 +134,7 @@ namespace UxPlayTray
             U = new InputUnion { ki = new KEYBDINPUT { wVk = vk, dwFlags = up ? KEYEVENTF_KEYUP : 0 } },
         };
 
+        const uint PW_CLIENTONLY = 0x1, PW_RENDERFULLCONTENT = 0x2;
         const uint INPUT_KEYBOARD = 1;
         const uint KEYEVENTF_KEYUP = 0x0002;
         const ushort VK_RETURN = 0x0D;
@@ -107,6 +150,12 @@ namespace UxPlayTray
         struct RECT
         {
             public int Left, Top, Right, Bottom;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct POINT
+        {
+            public int X, Y;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -171,6 +220,15 @@ namespace UxPlayTray
 
         [DllImport("user32.dll")]
         static extern bool SetWindowPos(IntPtr hwnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
+
+        [DllImport("user32.dll")]
+        static extern bool GetClientRect(IntPtr hwnd, out RECT rect);
+
+        [DllImport("user32.dll")]
+        static extern bool ClientToScreen(IntPtr hwnd, ref POINT point);
+
+        [DllImport("user32.dll")]
+        static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
 
         [DllImport("user32.dll", SetLastError = true)]
         static extern uint SendInput(uint count, INPUT[] inputs, int size);

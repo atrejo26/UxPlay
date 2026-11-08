@@ -3,7 +3,7 @@
 Mirror your iPhone or iPad screen to your Windows PC with AirPlay. No MSYS2, Bonjour or compiling needed.
 
 ### What's new
-- **Tested before every release.** 150 unit tests cover everyday use and the hard cases: broken settings files, odd device names, devices taking turns, and thousands of random inputs. Every build measures their coverage (99% of lines, 96% of branches) and fails below 95% / 90%. A release can only be published from a build that passed them.
+- **Tested before every release.** 154 unit tests cover everyday use and the hard cases: broken settings files, odd device names, devices taking turns, and thousands of random inputs. Every build measures their coverage (99% of lines, 97% of branches) and fails below 95% / 90%. A release can only be published from a build that passed them.
 - **No endless restart loops.** If uxplay.exe crashes, UxPlay still restarts it by itself, but after 3 crashes in 10 minutes it stops and tells you, with the log one click away.
 - **Fixes found by the new tests:** a device name with brackets, such as "Sam's (Work) iPhone", is shown in full; a malformed message from uxplay can no longer crash the tray app; a hand-edited quality value in settings.ini can't add uxplay options; Advanced options separated by tabs are recognised.
 - **Sound output choice (beta).** Settings → **Sound output**: if you see the picture but hear nothing, try *Windows audio (WASAPI)* or *Compatibility mode (DirectSound)*.
@@ -14,6 +14,7 @@ Mirror your iPhone or iPad screen to your Windows PC with AirPlay. No MSYS2, Bon
 - **Lowest delay (for games).** Settings → *Lowest delay* shows each frame the moment it arrives. The sound may then lag the picture slightly.
 - **Record your mirroring (beta).** Settings → *Save a video of each mirroring session* saves every session as an MP4 in **Videos\UxPlay**, named with the date and time. The tray menu gets **Open my recordings**. The video is saved as the iPhone sends it, with no re-encoding, so recording adds almost no load. Tip: VLC plays the iPhone's sound in these files; some built-in Windows players show the picture only.
 - **Status at a glance:** the tray icon gets a green dot while an iPhone is mirroring and a grey one when UxPlay is stopped.
+- **Save a screenshot** (tray menu, while an iPhone is mirroring): saves the mirror window as a PNG in **Pictures\UxPlay**, named with the date and time. Click the notice to open the folder.
 - **Keep on top of other windows** (tray menu): the mirror window stays above your other windows, handy for following along on the iPhone while you work.
 - **New-version notice.** About a minute after UxPlay starts, it checks once whether a newer release is out and shows a notice you can click to download it. Turn it off in Settings.
 - **About / check for updates** in the tray menu, and **Troubleshooting → Open UxPlay's data folder**.
