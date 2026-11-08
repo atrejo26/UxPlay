@@ -96,8 +96,8 @@ jobs:
           if ($missing) { throw "Missing GStreamer elements: $($missing -join ', ')" }
 
           # Start the receiver for a few seconds and make sure it comes up cleanly.
-          # Same video output options the tray app passes, so a rejected option fails here.
-          $uxArgs = '-n CI -nh -fps 60 -vs "d3d11videosink fullscreen-toggle-mode=alt-enter+property fullscreen=true"'
+          # Same video output and PIN options the tray app passes, so a rejected option fails here.
+          $uxArgs = '-n CI -nh -fps 60 -vs "d3d11videosink fullscreen-toggle-mode=alt-enter+property fullscreen=true" -pin -reg "' + "$env:RUNNER_TEMP\uxplay.register" + '"'
           $p = Start-Process "$ux\bin\uxplay.exe" -ArgumentList $uxArgs -PassThru -NoNewWindow `
                  -RedirectStandardOutput "$env:RUNNER_TEMP\out.txt" -RedirectStandardError "$env:RUNNER_TEMP\err.txt"
           Start-Sleep -Seconds 15
@@ -106,6 +106,8 @@ jobs:
           $log = (Get-Content "$env:RUNNER_TEMP\out.txt", "$env:RUNNER_TEMP\err.txt" -Raw) -join "`n"
           Write-Output $log
           if (-not $alive) { throw "uxplay.exe exited early (code $($p.ExitCode))" }
+          # uxplay's own messages must arrive while it runs (the tray app reads the PIN from them)
+          if ($log -notmatch 'Initialized server socket') { throw "uxplay.exe's messages did not arrive while it was running" }
           if ($log -match 'gst_parse_launch|no element|could not set property') { throw "uxplay.exe reported a GStreamer error" }
 
       - name: Upload portable app
