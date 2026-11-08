@@ -49,7 +49,7 @@ namespace UxPlayTray
         readonly RegisteredWaitHandle showWait;
         readonly System.Windows.Forms.Timer pendingRestartTimer;
         readonly System.Windows.Forms.Timer onTopTimer;
-        int onTopTries;
+        readonly OnTopWatcher onTop;
 
         readonly Settings settings;
         SettingsForm settingsForm;
@@ -145,6 +145,7 @@ namespace UxPlayTray
             pendingRestartTimer.Tick += (s, e) => ApplyPendingRestart();
 
             // Only runs for a few seconds after a connection, until the mirror window opens.
+            onTop = new OnTopWatcher(mirrorWindow);
             onTopTimer = new System.Windows.Forms.Timer { Interval = 500 };
             onTopTimer.Tick += (s, e) => ApplyOnTop();
 
@@ -399,15 +400,13 @@ namespace UxPlayTray
         {
             if (!settings.KeepOnTop)
                 return;
-            onTopTries = 0;
+            onTop.Start();
             onTopTimer.Start();
         }
 
         void ApplyOnTop()
         {
-            bool done = !settings.KeepOnTop || !receiver.IsRunning ||
-                        mirrorWindow.SetTopMost(receiver.ProcessId, true) || ++onTopTries >= 60;
-            if (done)
+            if (!onTop.Tick(settings.KeepOnTop, receiver.IsRunning, receiver.ProcessId))
                 onTopTimer.Stop();
         }
 

@@ -37,6 +37,8 @@
     <Compile Include="../tray/SoundTest.cs" Link="SoundTest.cs" />
     <Compile Include="../tray/UpdateCheck.cs" Link="UpdateCheck.cs" />
     <Compile Include="../tray/SoundTroubleshooter.cs" Link="SoundTroubleshooter.cs" />
+    <Compile Include="../tray/OnTopWatcher.cs" Link="OnTopWatcher.cs" />
+    <Compile Include="../tray/IMirrorWindow.cs" Link="IMirrorWindow.cs" />
   </ItemGroup>
 
   <ItemGroup>

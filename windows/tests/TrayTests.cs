@@ -546,3 +546,45 @@ public class UpdateCheckSetupTests
     [Fact]
     public void TestBuildIsNotARelease() => Assert.Null(ReleaseTag.Current);
 }
+
+/// <summary>A mirror window that opens after a given number of tries.</summary>
+sealed class FakeMirrorWindow : IMirrorWindow
+{
+    public int OpensAfter;
+    public int Tries;
+    public bool? TopMost;
+    public bool Exists(int processId) => Tries >= OpensAfter;
+    public bool? IsFullScreen(int processId) => null;
+    public bool SetFullScreen(int processId, bool fullScreen) => false;
+    public bool SetTopMost(int processId, bool topMost)
+    {
+        if (++Tries <= OpensAfter)
+            return false;
+        TopMost = topMost;
+        return true;
+    }
+}
+
+public class OnTopWatcherTests
+{
+    [Fact]
+    public void SetsTheWindowOnceItOpens()
+    {
+        var window = new FakeMirrorWindow { OpensAfter = 3 };
+        var watcher = new OnTopWatcher(window);
+        watcher.Start();
+        int ticks = 0;
+        while (watcher.Tick(true, true, 42))
+            ticks++;
+        Assert.Equal(3, ticks);
+        Assert.True(window.TopMost);
+    }
+
+    [Fact]
+    public void DoesNothingUntilStarted()
+    {
+        var window = new FakeMirrorWindow();
+        Assert.False(new OnTopWatcher(window).Tick(true, true, 42));
+        Assert.Equal(0, window.Tries);
+    }
+}

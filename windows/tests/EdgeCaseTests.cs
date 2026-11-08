@@ -388,3 +388,58 @@ public class ReleaseTagEdgeCases
     public void UnusualGitHubReplies(string json, string tag) =>
         Assert.Equal(tag, GitHubUpdateCheck.ParseTag(json));
 }
+
+public class OnTopWatcherEdgeCases
+{
+    [Fact]
+    public void GivesUpWhenTheWindowNeverOpens()
+    {
+        var window = new FakeMirrorWindow { OpensAfter = int.MaxValue };
+        var watcher = new OnTopWatcher(window);
+        watcher.Start();
+        int ticks = 0;
+        while (watcher.Tick(true, true, 42))
+            ticks++;
+        Assert.Equal(OnTopWatcher.MaxTries, window.Tries);
+        Assert.Equal(OnTopWatcher.MaxTries - 1, ticks);
+        Assert.False(watcher.IsWatching);
+    }
+
+    [Theory]
+    [InlineData(false, true)]   // the setting was turned off meanwhile
+    [InlineData(true, false)]   // uxplay.exe stopped meanwhile
+    public void StopsWithoutTouchingTheWindow(bool wanted, bool running)
+    {
+        var window = new FakeMirrorWindow();
+        var watcher = new OnTopWatcher(window);
+        watcher.Start();
+        Assert.False(watcher.Tick(wanted, running, 42));
+        Assert.Equal(0, window.Tries);
+    }
+
+    [Fact]
+    public void ARestartGivesAFreshThirtySeconds()
+    {
+        var window = new FakeMirrorWindow { OpensAfter = int.MaxValue };
+        var watcher = new OnTopWatcher(window);
+        watcher.Start();
+        for (int i = 0; i < OnTopWatcher.MaxTries - 5; i++)
+            watcher.Tick(true, true, 42);
+        watcher.Start();  // a second iPhone connected
+        int ticks = 0;
+        while (watcher.Tick(true, true, 42))
+            ticks++;
+        Assert.Equal(OnTopWatcher.MaxTries - 1, ticks);
+    }
+
+    [Fact]
+    public void StopIsFinal()
+    {
+        var window = new FakeMirrorWindow { OpensAfter = int.MaxValue };
+        var watcher = new OnTopWatcher(window);
+        watcher.Start();
+        watcher.Stop();
+        Assert.False(watcher.Tick(true, true, 42));
+        Assert.Equal(0, window.Tries);
+    }
+}

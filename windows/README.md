@@ -121,6 +121,7 @@ that picks the concrete classes.
 | `UxPlayCommandLine` | Turns `Settings` into uxplay options |
 | `IStartupRegistration` / `RunKeyStartup` | "Start UxPlay when I sign in" |
 | `IMirrorWindow` / `MirrorWindow` | Finds the video window and switches full screen |
+| `OnTopWatcher` | "Keep on top": retries until the video window has opened, for up to 30 s |
 | `IKeepAwake` / `KeepAwake` | Keeps the screen on while mirroring |
 | `IFirewall` / `WindowsFirewall` | The Windows Firewall rule |
 | `SettingsForm`, `PinForm` | The Settings and PIN windows |
