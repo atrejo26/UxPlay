@@ -29,6 +29,7 @@ Right-click the UxPlay icon for:
     on, a window shows the 4-digit code to type on the iPhone the first
     time it connects.
   - Troubleshooting: Windows Firewall fix, test sound and the log
+  - Keep on top of other windows: the mirror window stays in front
   - A notice when a new version is out (can be turned off in Settings)
 
 Smoother mirroring

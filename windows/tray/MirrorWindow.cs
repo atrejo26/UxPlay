@@ -15,6 +15,9 @@ namespace UxPlayTray
 
         /// <summary>Switches the open window in or out of full screen; false when there is none.</summary>
         bool SetFullScreen(int processId, bool fullScreen);
+
+        /// <summary>Keeps the open window above other windows, or not; false when there is none.</summary>
+        bool SetTopMost(int processId, bool topMost);
     }
 
     /// <summary>
@@ -64,6 +67,15 @@ namespace UxPlayTray
             return windows.Count > 0;
         }
 
+        public bool SetTopMost(int processId, bool topMost)
+        {
+            var windows = Find(processId);
+            foreach (var hwnd in windows)
+                SetWindowPos(hwnd, topMost ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
+                             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            return windows.Count > 0;
+        }
+
         /// <summary>A window covering its whole monitor is in full screen.</summary>
         static bool IsFullScreen(IntPtr hwnd)
         {
@@ -100,6 +112,9 @@ namespace UxPlayTray
         const ushort VK_RETURN = 0x0D;
         const ushort VK_MENU = 0x12;  // Alt
         const uint MONITOR_DEFAULTTONEAREST = 2;
+        static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
+        const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOACTIVATE = 0x0010;
 
         delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
 
@@ -168,6 +183,9 @@ namespace UxPlayTray
 
         [DllImport("user32.dll")]
         static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
+
+        [DllImport("user32.dll")]
+        static extern bool SetWindowPos(IntPtr hwnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
 
         [DllImport("user32.dll", SetLastError = true)]
         static extern uint SendInput(uint count, INPUT[] inputs, int size);

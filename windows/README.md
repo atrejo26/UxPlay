@@ -35,8 +35,8 @@ protected your PC"*. Click **More info → Run anyway**.
 Press **Alt+Enter** in the mirror window, or use **Full screen** in the tray
 menu, to switch between a window and borderless full screen without
 disconnecting. Right-click the tray icon for settings (name, quality, sound,
-PIN, start with Windows, new-version notice), restart, the log, a test sound
-and a Windows Firewall fix.
+PIN, start with Windows, new-version notice), keep the mirror window on top,
+restart, the log, a test sound and a Windows Firewall fix.
 
 With **Ask for a PIN** on, a window pops up with the 4-digit code to type on
 the iPhone the first time it connects; UxPlay remembers the iPhone after that.

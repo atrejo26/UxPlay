@@ -319,4 +319,22 @@ public class ReleaseTagTests
         Assert.False(IniSettingsStore.Parse(IniSettingsStore.Format(s)).CheckForUpdates);
         Assert.True(IniSettingsStore.Parse(new string[0]).CheckForUpdates);
     }
+
+    [Fact]
+    public void KeepOnTopIsSavedAndOffByDefault()
+    {
+        Assert.False(IniSettingsStore.Parse(new string[0]).KeepOnTop);
+        Assert.True(IniSettingsStore.Parse(IniSettingsStore.Format(new Settings { KeepOnTop = true })).KeepOnTop);
+    }
+
+    [Fact]
+    public void KeepOnTopDoesNotChangeTheCommandLine()
+    {
+        // switching it must never restart uxplay (and disconnect the iPhone)
+        var s = new Settings();
+        string before = UxPlayCommandLine.Build(s, @"C:\data");
+        s.KeepOnTop = true;
+        s.CheckForUpdates = false;
+        Assert.Equal(before, UxPlayCommandLine.Build(s, @"C:\data"));
+    }
 }

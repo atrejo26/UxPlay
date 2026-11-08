@@ -62,6 +62,7 @@ namespace UxPlayTray
                     case "pin": s.RequirePin = val == "1"; break;
                     case "extra": s.ExtraArgs = val; break;
                     case "updates": s.CheckForUpdates = val != "0"; break;
+                    case "ontop": s.KeepOnTop = val == "1"; break;
                 }
             }
             // "-vs d3d11videosink" was the manual workaround for full screen before the
@@ -82,6 +83,7 @@ namespace UxPlayTray
             "pin=" + (s.RequirePin ? "1" : "0"),
             "extra=" + s.ExtraArgs,
             "updates=" + (s.CheckForUpdates ? "1" : "0"),
+            "ontop=" + (s.KeepOnTop ? "1" : "0"),
         };
 
         public void Save(Settings settings)

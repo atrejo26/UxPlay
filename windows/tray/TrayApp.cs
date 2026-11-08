@@ -41,10 +41,12 @@ namespace UxPlayTray
 
         readonly NotifyIcon tray;
         readonly Control ui;  // marshals receiver events onto the UI thread
-        readonly ToolStripMenuItem statusItem, startStopItem, restartItem, fullScreenItem, soundTestItem;
+        readonly ToolStripMenuItem statusItem, startStopItem, restartItem, fullScreenItem, onTopItem, soundTestItem;
         readonly EventWaitHandle showEvent;
         readonly RegisteredWaitHandle showWait;
         readonly System.Windows.Forms.Timer pendingRestartTimer;
+        readonly System.Windows.Forms.Timer onTopTimer;
+        int onTopTries;
 
         readonly Settings settings;
         SettingsForm settingsForm;
@@ -83,6 +85,10 @@ namespace UxPlayTray
                 ShortcutKeyDisplayString = "Alt+Enter",
             };
 
+            onTopItem = new ToolStripMenuItem("Keep on top of other windows", null, (s, e) => ToggleOnTop())
+            {
+                Checked = settings.KeepOnTop,
+            };
             soundTestItem = new ToolStripMenuItem("Play a test sound", null, async (s, e) => await TestSound());
 
             var menu = new ContextMenuStrip();
@@ -97,6 +103,7 @@ namespace UxPlayTray
                 startStopItem,
                 restartItem,
                 fullScreenItem,
+                onTopItem,
                 new ToolStripMenuItem("Settings...", null, (s, e) => ShowSettings()),
                 new ToolStripSeparator(),
                 new ToolStripMenuItem("Troubleshooting", null,
@@ -123,6 +130,10 @@ namespace UxPlayTray
             // Only runs while a changed setting waits for mirroring to end.
             pendingRestartTimer = new System.Windows.Forms.Timer { Interval = 3000 };
             pendingRestartTimer.Tick += (s, e) => ApplyPendingRestart();
+
+            // Only runs for a few seconds after a connection, until the mirror window opens.
+            onTopTimer = new System.Windows.Forms.Timer { Interval = 500 };
+            onTopTimer.Tick += (s, e) => ApplyOnTop();
 
             // A second launch of UxPlay.exe signals this event instead of starting another copy.
             showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, Program.ShowEventName);
@@ -271,6 +282,7 @@ namespace UxPlayTray
             ClosePin();  // paired: the code is no longer needed
             keepAwake.Set(true);  // don't let the screen turn off while mirroring
             SetStatus("Connected: " + device);
+            WatchForMirrorWindow();
             if (isNew)
                 ShowBalloon(3000, "UxPlay", device + " is connecting...", ToolTipIcon.None);
         }
@@ -330,6 +342,34 @@ namespace UxPlayTray
                 SetRestartPending(true);
             else
                 RestartReceiver();
+        }
+
+        // ---- keep on top --------------------------------------------------------
+
+        void ToggleOnTop()
+        {
+            settings.KeepOnTop = !settings.KeepOnTop;
+            onTopItem.Checked = settings.KeepOnTop;
+            SaveSettings();
+            if (receiver.IsRunning)
+                mirrorWindow.SetTopMost(receiver.ProcessId, settings.KeepOnTop);
+        }
+
+        /// <summary>The mirror window opens a moment after the iPhone connects: wait up to 30 s for it.</summary>
+        void WatchForMirrorWindow()
+        {
+            if (!settings.KeepOnTop)
+                return;
+            onTopTries = 0;
+            onTopTimer.Start();
+        }
+
+        void ApplyOnTop()
+        {
+            bool done = !settings.KeepOnTop || !receiver.IsRunning ||
+                        mirrorWindow.SetTopMost(receiver.ProcessId, true) || ++onTopTries >= 60;
+            if (done)
+                onTopTimer.Stop();
         }
 
         void SetRestartPending(bool pending)
@@ -555,6 +595,7 @@ namespace UxPlayTray
                 ClosePin();
                 keepAwake.Set(false);
                 pendingRestartTimer.Dispose();
+                onTopTimer.Dispose();
                 showWait.Unregister(null);
                 showEvent.Dispose();
                 tray.Visible = false;
