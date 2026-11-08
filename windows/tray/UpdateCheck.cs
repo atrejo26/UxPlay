@@ -64,6 +64,18 @@ namespace UxPlayTray
         Task<string> LatestReleaseTagAsync();
     }
 
+    static class UpdateCheckExtensions
+    {
+        /// <summary>The newest release's tag when it is newer than <paramref name="current"/>, else null.</summary>
+        public static async Task<string> NewerReleaseAsync(this IUpdateCheck check, string current)
+        {
+            if (current == null)
+                return null;
+            string latest = await check.LatestReleaseTagAsync();
+            return latest != null && ReleaseTag.IsNewer(latest, current) ? latest : null;
+        }
+    }
+
     /// <summary>One small request to GitHub's releases API (pre-releases aren't included).</summary>
     sealed class GitHubUpdateCheck : IUpdateCheck
     {

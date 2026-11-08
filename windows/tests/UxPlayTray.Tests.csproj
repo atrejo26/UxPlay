@@ -20,6 +20,7 @@
     <Compile Include="../tray/GStreamerEnvironment.cs" Link="GStreamerEnvironment.cs" />
     <Compile Include="../tray/SoundTest.cs" Link="SoundTest.cs" />
     <Compile Include="../tray/UpdateCheck.cs" Link="UpdateCheck.cs" />
+    <Compile Include="../tray/SoundTroubleshooter.cs" Link="SoundTroubleshooter.cs" />
   </ItemGroup>
 
   <ItemGroup>

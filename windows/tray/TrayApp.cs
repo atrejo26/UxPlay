@@ -19,6 +19,7 @@ namespace UxPlayTray
         public IFirewall Firewall;
         public ISoundTest SoundTest;
         public IUpdateCheck UpdateCheck;
+        public IPrompt Prompt;
     }
 
     /// <summary>
@@ -37,6 +38,7 @@ namespace UxPlayTray
         readonly IFirewall firewall;
         readonly ISoundTest soundTest;
         readonly IUpdateCheck updateCheck;
+        readonly IPrompt prompt;
         readonly ConnectionMonitor connection = new ConnectionMonitor();
 
         readonly NotifyIcon tray;
@@ -65,6 +67,7 @@ namespace UxPlayTray
             firewall = services.Firewall;
             soundTest = services.SoundTest;
             updateCheck = services.UpdateCheck;
+            prompt = services.Prompt;
             settings = store.Load();
 
             ui = new Control();
@@ -184,8 +187,8 @@ namespace UxPlayTray
             await System.Threading.Tasks.Task.Delay(TimeSpan.FromMinutes(1));
             if (!settings.CheckForUpdates)
                 return;
-            string latest = await updateCheck.LatestReleaseTagAsync();
-            if (latest == null || !ReleaseTag.IsNewer(latest, current))
+            string latest = await updateCheck.NewerReleaseAsync(current);
+            if (latest == null)
                 return;
             // don't cover the PIN or a connection message while someone is mirroring
             if (pinForm != null || connection.IsConnected)
@@ -523,77 +526,27 @@ namespace UxPlayTray
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
-        /// <summary>
-        /// Plays a beep through the receiver's sound output and helps fix silent mirroring:
-        /// a beep that isn't heard points at the PC's sound, one that is points at the network.
-        /// </summary>
+        /// <summary>Helps fix silent mirroring, and switches to compatibility mode when only that is heard.</summary>
         async System.Threading.Tasks.Task TestSound()
         {
             soundTestItem.Enabled = false;
             try
             {
-                string sink = settings.AudioSink;
-                var result = await soundTest.PlayAsync(sink);
-                if (result == SoundTestResult.Unavailable)
-                {
-                    MessageBox.Show("This copy of UxPlay can't play a test sound. Please install the latest version.",
-                        "UxPlay", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                var outcome = await new SoundTroubleshooter(soundTest, prompt).RunAsync(settings.AudioSink);
+                if (outcome != SoundTestOutcome.UseCompatibilityMode)
                     return;
-                }
-                bool heard = result == SoundTestResult.Played && MessageBox.Show(
-                    "UxPlay just played a short beep through \"" + AudioOutputLabel(sink) + "\".\n\nDid you hear it?",
-                    "UxPlay sound test", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
-                if (heard)
-                {
-                    MessageBox.Show(
-                        "Sound on this PC works.\n\nIf mirroring is still silent:\n" +
-                        "- Turn up the volume on your iPhone while mirroring (it controls UxPlay's volume).\n" +
-                        "- Check that Settings > Play iPhone sound on this PC is ticked.\n" +
-                        "- Sound comes over the network separately from the picture. If you use a firewall " +
-                        "or security suite other than Windows Firewall, allow uxplay.exe there for UDP too.",
-                        "UxPlay sound test", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
-                }
-                if (sink != "directsoundsink")
-                {
-                    // Try the output that works with the most sound drivers.
-                    var retry = await soundTest.PlayAsync("directsoundsink");
-                    if (retry == SoundTestResult.Played && MessageBox.Show(
-                            "UxPlay played the beep again, this time in compatibility mode.\n\nDid you hear it now?",
-                            "UxPlay sound test", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
-                    {
-                        settings.AudioSink = "directsoundsink";
-                        SaveSettings();
-                        // keep a connected iPhone connected; switch once mirroring ends
-                        if (receiver.IsRunning && connection.IsConnected)
-                            SetRestartPending(true);
-                        else
-                            RestartReceiver();
-                        MessageBox.Show("UxPlay now uses compatibility mode for sound. You can change this in Settings > Sound output.",
-                            "UxPlay sound test", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        return;
-                    }
-                }
-                MessageBox.Show(
-                    "The beep couldn't be heard, so the problem is with this PC's sound, not with your iPhone.\n\n" +
-                    "- Check that the PC isn't muted and that the right speakers or headphones are chosen " +
-                    "(click the speaker icon near the clock).\n" +
-                    "- Make sure the volume mixer doesn't have UxPlay or gst-launch muted.\n" +
-                    "- Then try the sound test again.",
-                    "UxPlay sound test", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                settings.AudioSink = SoundTroubleshooter.CompatibilitySink;
+                SaveSettings();
+                // keep a connected iPhone connected; switch once mirroring ends
+                if (receiver.IsRunning && connection.IsConnected)
+                    SetRestartPending(true);
+                else
+                    RestartReceiver();
             }
             finally
             {
                 soundTestItem.Enabled = true;
             }
-        }
-
-        static string AudioOutputLabel(string sink)
-        {
-            foreach (var (label, value) in Settings.AudioOutputs)
-                if (value == sink)
-                    return label;
-            return sink;
         }
 
         void ShowAbout()

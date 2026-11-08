@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using UxPlayTray;
@@ -405,5 +406,112 @@ public class YouTubeVideoTests
     {
         var s = new Settings { YouTubeVideo = true, ExtraArgs = "-hls 2" };
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(s.Build(), "-hls"));
+    }
+}
+
+public class SoundTroubleshooterTests
+{
+    /// <summary>Plays what it is told to and records which outputs were tried.</summary>
+    sealed class FakeSoundTest : ISoundTest
+    {
+        readonly SoundTestResult result;
+        public readonly List<string> Played = new List<string>();
+        public FakeSoundTest(SoundTestResult result) { this.result = result; }
+        public Task<SoundTestResult> PlayAsync(string sink) { Played.Add(sink); return Task.FromResult(result); }
+    }
+
+    /// <summary>Answers the yes/no questions in order and records what was said.</summary>
+    sealed class ScriptedPrompt : IPrompt
+    {
+        readonly Queue<bool> answers;
+        public readonly List<string> Told = new List<string>();
+        public bool LastWasWarning;
+        public ScriptedPrompt(params bool[] answers) { this.answers = new Queue<bool>(answers); }
+        public bool Ask(string title, string question) => answers.Dequeue();
+        public void Tell(string title, string message, bool warning = false) { Told.Add(message); LastWasWarning = warning; }
+    }
+
+    [Fact]
+    public async Task HeardBeepPointsAtTheNetwork()
+    {
+        var test = new FakeSoundTest(SoundTestResult.Played);
+        var prompt = new ScriptedPrompt(true);
+        Assert.Equal(SoundTestOutcome.PcSoundWorks, await new SoundTroubleshooter(test, prompt).RunAsync(""));
+        Assert.Equal(new[] { "" }, test.Played);
+        Assert.Contains("UDP", prompt.Told[0]);
+    }
+
+    [Fact]
+    public async Task OnlyCompatibilityModeHeardSwitchesToIt()
+    {
+        var test = new FakeSoundTest(SoundTestResult.Played);
+        var prompt = new ScriptedPrompt(false, true);
+        Assert.Equal(SoundTestOutcome.UseCompatibilityMode, await new SoundTroubleshooter(test, prompt).RunAsync("wasapisink"));
+        Assert.Equal(new[] { "wasapisink", SoundTroubleshooter.CompatibilitySink }, test.Played);
+    }
+
+    [Fact]
+    public async Task NothingHeardPointsAtThePcSound()
+    {
+        var test = new FakeSoundTest(SoundTestResult.Played);
+        var prompt = new ScriptedPrompt(false, false);
+        Assert.Equal(SoundTestOutcome.PcSoundProblem, await new SoundTroubleshooter(test, prompt).RunAsync(""));
+        Assert.True(prompt.LastWasWarning);
+    }
+
+    [Fact]
+    public async Task CompatibilityModeIsNotTriedTwice()
+    {
+        var test = new FakeSoundTest(SoundTestResult.Played);
+        var prompt = new ScriptedPrompt(false);
+        Assert.Equal(SoundTestOutcome.PcSoundProblem,
+            await new SoundTroubleshooter(test, prompt).RunAsync(SoundTroubleshooter.CompatibilitySink));
+        Assert.Single(test.Played);
+    }
+
+    [Fact]
+    public async Task FailedPlayerSkipsTheQuestions()
+    {
+        var test = new FakeSoundTest(SoundTestResult.Failed);
+        var prompt = new ScriptedPrompt();  // any question would throw
+        Assert.Equal(SoundTestOutcome.PcSoundProblem, await new SoundTroubleshooter(test, prompt).RunAsync(""));
+        Assert.Equal(2, test.Played.Count);
+    }
+
+    [Fact]
+    public async Task MissingPlayerIsReported()
+    {
+        var prompt = new ScriptedPrompt();
+        Assert.Equal(SoundTestOutcome.Unavailable,
+            await new SoundTroubleshooter(new FakeSoundTest(SoundTestResult.Unavailable), prompt).RunAsync(""));
+        Assert.Single(prompt.Told);
+    }
+
+    [Fact]
+    public void OutputLabels()
+    {
+        Assert.Equal("Automatic (recommended)", Settings.AudioOutputLabel(""));
+        Assert.Equal("pulsesink", Settings.AudioOutputLabel("pulsesink"));
+    }
+}
+
+public class NewerReleaseTests
+{
+    sealed class FixedUpdateCheck : IUpdateCheck
+    {
+        readonly string tag;
+        public FixedUpdateCheck(string tag) { this.tag = tag; }
+        public Task<string> LatestReleaseTagAsync() => Task.FromResult(tag);
+    }
+
+    [Theory]
+    [InlineData("v1.74-win3", "v1.74-win2", "v1.74-win3")]
+    [InlineData("v1.74-win2", "v1.74-win2", null)]
+    [InlineData("v1.74-win1", "v1.74-win2", null)]
+    [InlineData(null, "v1.74-win2", null)]
+    [InlineData("v1.74-win3", null, null)]
+    public async Task OnlyANewerReleaseIsOffered(string latest, string current, string expected)
+    {
+        Assert.Equal(expected, await new FixedUpdateCheck(latest).NewerReleaseAsync(current));
     }
 }

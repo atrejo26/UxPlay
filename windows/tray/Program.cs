@@ -46,6 +46,7 @@ namespace UxPlayTray
                 Firewall = new WindowsFirewall(),
                 SoundTest = new GStreamerSoundTest(AppPaths.ServerDir, AppPaths.DataDir),
                 UpdateCheck = new GitHubUpdateCheck("atrejo26/UxPlay"),
+                Prompt = new MessageBoxPrompt(),
             };
             // Disposing the app removes the tray icon and stops uxplay.exe on Quit.
             using (var app = new TrayApp(services))

@@ -54,6 +54,15 @@ namespace UxPlayTray
         public bool HasOption(string option) =>
             (" " + ExtraArgs + " ").IndexOf(" " + option + " ", StringComparison.Ordinal) >= 0;
 
+        /// <summary>The Settings window's name for a sound output.</summary>
+        public static string AudioOutputLabel(string sink)
+        {
+            foreach (var (label, value) in AudioOutputs)
+                if (value == sink)
+                    return label;
+            return sink;
+        }
+
         public static string CleanName(string name)
         {
             var sb = new StringBuilder();
