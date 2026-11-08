@@ -664,3 +664,31 @@ public class ScreenshotNameTests
         Assert.Equal(Path.Combine("pics", "UxPlay 2026-11-08 07-05-09 (3).png"), path);
     }
 }
+
+public class ErrorLogTests
+{
+    [Fact]
+    public void SavesTheErrorWithItsTime()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "uxplay-errlog-" + Guid.NewGuid());
+        string path = Path.Combine(dir, "tray-error.log");
+        try
+        {
+            Assert.True(ErrorLog.Append(path, new DateTime(2026, 11, 8, 9, 1, 2), new InvalidOperationException("boom")));
+            Assert.True(ErrorLog.Append(path, new DateTime(2026, 11, 8, 9, 1, 3), null));
+            string text = File.ReadAllText(path);
+            Assert.StartsWith("2026-11-08 09:01:02  System.InvalidOperationException: boom", text);
+            Assert.Contains("2026-11-08 09:01:03  unknown error", text);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public void OldFileNameKeepsTheExtension()
+    {
+        Assert.Equal(Path.Combine("d", "tray-error.old.log"), ErrorLog.OldPath(Path.Combine("d", "tray-error.log")));
+    }
+}

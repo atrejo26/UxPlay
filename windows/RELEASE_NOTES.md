@@ -3,7 +3,7 @@
 Mirror your iPhone or iPad screen to your Windows PC with AirPlay. No MSYS2, Bonjour or compiling needed.
 
 ### What's new
-- **Tested before every release.** 154 unit tests cover everyday use and the hard cases: broken settings files, odd device names, devices taking turns, and thousands of random inputs. Every build measures their coverage (99% of lines, 97% of branches) and fails below 95% / 90%. A release can only be published from a build that passed them.
+- **Tested before every release.** 158 unit tests cover everyday use and the hard cases: broken settings files, odd device names, devices taking turns, and thousands of random inputs. Every build measures their coverage (99% of lines, 97% of branches) and fails below 95% / 90%. A release can only be published from a build that passed them.
 - **No endless restart loops.** If uxplay.exe crashes, UxPlay still restarts it by itself, but after 3 crashes in 10 minutes it stops and tells you, with the log one click away.
 - **Fixes found by the new tests:** a device name with brackets, such as "Sam's (Work) iPhone", is shown in full; a malformed message from uxplay can no longer crash the tray app; a hand-edited quality value in settings.ini can't add uxplay options; Advanced options separated by tabs are recognised.
 - **Sound output choice (beta).** Settings → **Sound output**: if you see the picture but hear nothing, try *Windows audio (WASAPI)* or *Compatibility mode (DirectSound)*.
@@ -22,7 +22,7 @@ Mirror your iPhone or iPad screen to your Windows PC with AirPlay. No MSYS2, Bon
 - **Smoother video:** mirroring now runs at 60 fps by default (UxPlay on its own uses 30). Settings → **Smoothness** has a 30 fps option for older PCs or weak Wi-Fi.
 - **PIN codes now appear on screen.** With **Ask for a PIN** turned on, a window shows the 4-digit code to type on your iPhone. Before, the code was hidden and couldn't be read.
 - **The screen stays on while you mirror**, and the PC can sleep normally when nothing is connected.
-- **Lighter on your PC:** changing a setting that doesn't affect mirroring no longer disconnects your iPhone, nothing runs in the background while idle, and the log can't grow without limit.
+- **Lighter on your PC:** changing a setting that doesn't affect mirroring no longer disconnects your iPhone, nothing runs in the background while idle, and neither the log nor the error log can grow without limit.
 - Fixes: the tray shows when your iPhone disconnects, the Full screen tick matches the window after Alt+Enter, the tray icon no longer lingers after Quit, and the log of a crash is kept.
 
 ### Download

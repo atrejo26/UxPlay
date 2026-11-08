@@ -615,3 +615,41 @@ public class ScreenshotNameEdgeCases
         Assert.Equal(500, taken.Count);
     }
 }
+
+public class ErrorLogEdgeCases
+{
+    [Fact]
+    public void AnErrorThatKeepsComingBackCantFillTheDisk()
+    {
+        string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "uxplay-errlog-" + Guid.NewGuid());
+        string path = System.IO.Path.Combine(dir, "tray-error.log");
+        try
+        {
+            var error = new Exception(new string('x', 50_000));
+            for (int i = 0; i < 100; i++)  // ~5 MB of errors
+                Assert.True(ErrorLog.Append(path, DateTime.Now, error));
+            Assert.True(new System.IO.FileInfo(path).Length <= ErrorLog.MaxBytes + 60_000);
+            Assert.True(new System.IO.FileInfo(ErrorLog.OldPath(path)).Length <= ErrorLog.MaxBytes + 60_000);
+            Assert.Equal(2, System.IO.Directory.GetFiles(dir).Length);  // never more than two files
+        }
+        finally
+        {
+            System.IO.Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public void AFolderThatCantBeMadeIsNotACrash()
+    {
+        // a file where the folder should be: the error is lost, but reporting it doesn't throw
+        string file = System.IO.Path.GetTempFileName();
+        try
+        {
+            Assert.False(ErrorLog.Append(System.IO.Path.Combine(file, "tray-error.log"), DateTime.Now, new Exception("x")));
+        }
+        finally
+        {
+            System.IO.File.Delete(file);
+        }
+    }
+}

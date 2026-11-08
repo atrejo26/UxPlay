@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -57,15 +56,9 @@ namespace UxPlayTray
         /// <summary>Saves an unexpected error for troubleshooting and tells the user.</summary>
         static void ReportError(Exception ex)
         {
-            try
-            {
-                Directory.CreateDirectory(AppPaths.DataDir);
-                File.AppendAllText(AppPaths.ErrorLog,
-                    DateTime.Now + "  " + ex + Environment.NewLine + Environment.NewLine);
-            }
-            catch (Exception) { }
+            bool saved = ErrorLog.Append(AppPaths.ErrorLog, DateTime.Now, ex);
             MessageBox.Show("Something went wrong in UxPlay:\n" + ex?.Message +
-                "\n\nDetails were saved in " + AppPaths.ErrorLog,
+                (saved ? "\n\nDetails were saved in " + AppPaths.ErrorLog : ""),
                 "UxPlay", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }

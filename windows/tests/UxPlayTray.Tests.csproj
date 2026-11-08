@@ -42,6 +42,7 @@
     <Compile Include="../tray/LogFile.cs" Link="LogFile.cs" />
     <Compile Include="../tray/IMirrorWindow.cs" Link="IMirrorWindow.cs" />
     <Compile Include="../tray/ScreenshotName.cs" Link="ScreenshotName.cs" />
+    <Compile Include="../tray/ErrorLog.cs" Link="ErrorLog.cs" />
   </ItemGroup>
 
   <ItemGroup>
