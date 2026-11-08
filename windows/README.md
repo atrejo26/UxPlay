@@ -50,6 +50,8 @@ connected UxPlay sits idle and the PC sleeps as usual.
 - Wi-Fi matters most. Use your router's **5 GHz** network, keep the iPhone
   near the router, and connect the PC with an **Ethernet cable** if you can.
 - If the picture stutters or freezes, set **Quality** to 720p.
+- Playing games? Tick **Lowest delay** in Settings. Each frame is shown as
+  soon as it arrives, at the cost of sound that can lag the picture slightly.
 - Close heavy programs (games, video calls, big downloads) while mirroring.
 
 The installer adds a Windows Firewall rule for UxPlay on all network types,

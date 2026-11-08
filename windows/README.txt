@@ -40,6 +40,7 @@ Smoother mirroring
   - Use your router's 5 GHz Wi-Fi, keep the iPhone near the router, and
     connect the PC with an Ethernet cable if you can.
   - If the picture stutters, set Settings > Quality to 720p.
+  - Playing games? Settings > tick "Lowest delay".
 
 iPhone doesn't show this PC?
 ----------------------------

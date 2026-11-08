@@ -40,6 +40,10 @@ namespace UxPlayTray
                 args.Add("-s " + s.Resolution);
             // uxplay asks the iPhone for at most 30 frames per second unless told otherwise.
             args.Add("-fps " + s.Fps);
+            // Show each frame as soon as it arrives instead of on its timestamp: less
+            // delay for games, at the cost of sound that can drift slightly from the picture.
+            if (s.LowLatency && !s.HasOption("-vsync"))
+                args.Add("-vsync no");
             if (!s.Audio)
                 args.Add("-as 0");
             else if (s.AudioSink.Length > 0 && !s.HasOption("-as"))

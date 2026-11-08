@@ -119,7 +119,7 @@ jobs:
           # Same video output and PIN options the tray app passes, so a rejected option fails here.
           # The recording goes to a folder with a space, as Videos\UxPlay\UxPlay <date> <time> does.
           New-Item -ItemType Directory -Force "$env:RUNNER_TEMP\rec dir" | Out-Null
-          $uxArgs = '-n CI -nh -fps 60 -vs "d3d11videosink fullscreen-toggle-mode=alt-enter+property fullscreen=true" -pin -reg "' + "$env:RUNNER_TEMP\uxplay.register" + '"' +
+          $uxArgs = '-n CI -nh -fps 60 -vsync no -vs "d3d11videosink fullscreen-toggle-mode=alt-enter+property fullscreen=true" -pin -reg "' + "$env:RUNNER_TEMP\uxplay.register" + '"' +
                     ' -mp4 "' + "$env:RUNNER_TEMP\rec dir\UxPlay 2026-01-01 00-00-00" + '"'
           $p = Start-Process "$ux\bin\uxplay.exe" -ArgumentList $uxArgs -PassThru -NoNewWindow `
                  -RedirectStandardOutput "$env:RUNNER_TEMP\out.txt" -RedirectStandardError "$env:RUNNER_TEMP\err.txt"

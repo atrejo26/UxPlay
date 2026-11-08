@@ -41,6 +41,7 @@ namespace UxPlayTray
         public bool CheckForUpdates = true;
         public bool KeepOnTop = false;
         public bool Record = false;
+        public bool LowLatency = false;
 
         /// <summary>The name shown on the iPhone, as uxplay will use it.</summary>
         public string DisplayName => CleanName(Name);

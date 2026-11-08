@@ -367,3 +367,23 @@ public class RecordingTests
         Assert.True(IniSettingsStore.Parse(IniSettingsStore.Format(new Settings { Record = true })).Record);
     }
 }
+
+public class LowLatencyTests
+{
+    [Fact]
+    public void LowLatencySwitchesOffTimestampSync()
+    {
+        var s = new Settings();
+        Assert.DoesNotContain("-vsync", s.Build());
+        s.LowLatency = true;
+        Assert.Contains("-vsync no", s.Build());
+        Assert.True(IniSettingsStore.Parse(IniSettingsStore.Format(s)).LowLatency);
+    }
+
+    [Fact]
+    public void OwnVsyncOptionWins()
+    {
+        var s = new Settings { LowLatency = true, ExtraArgs = "-vsync 0.2" };
+        Assert.DoesNotContain("-vsync no", s.Build());
+    }
+}

@@ -13,6 +13,7 @@ namespace UxPlayTray
         readonly ComboBox resolutionBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
         readonly ComboBox frameRateBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
         readonly CheckBox fullScreenBox = new CheckBox { Text = "Start in full screen (no borders) - switch any time with Alt+Enter", AutoSize = true };
+        readonly CheckBox lowLatencyBox = new CheckBox { Text = "Lowest delay (for games) - sound may lag the picture slightly", AutoSize = true };
         readonly CheckBox audioBox = new CheckBox { Text = "Play iPhone sound on this PC", AutoSize = true };
         readonly ComboBox audioOutputBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
         readonly CheckBox pinBox = new CheckBox { Text = "Ask for a PIN the first time a new device connects", AutoSize = true };
@@ -52,6 +53,7 @@ namespace UxPlayTray
             int fpsIndex = Array.FindIndex(Settings.FrameRates, f => f.Fps == settings.Fps);
             frameRateBox.SelectedIndex = fpsIndex >= 0 ? fpsIndex : 0;
             fullScreenBox.Checked = settings.FullScreen;
+            lowLatencyBox.Checked = settings.LowLatency;
             audioBox.Checked = settings.Audio;
             int audioIndex = Array.FindIndex(Settings.AudioOutputs, o => o.Sink == settings.AudioSink);
             audioOutputBox.SelectedIndex = audioIndex >= 0 ? audioIndex : 0;
@@ -74,6 +76,7 @@ namespace UxPlayTray
             AddRow(grid, "Quality:", resolutionBox);
             AddRow(grid, "Smoothness:", frameRateBox);
             AddRow(grid, null, fullScreenBox);
+            AddRow(grid, null, lowLatencyBox);
             AddRow(grid, null, audioBox);
             AddRow(grid, "Sound output:", audioOutputBox);
             AddRow(grid, null, pinBox);
@@ -132,6 +135,7 @@ namespace UxPlayTray
             settings.Resolution = Settings.Resolutions[resolutionBox.SelectedIndex].Size;
             settings.Fps = Settings.FrameRates[frameRateBox.SelectedIndex].Fps;
             settings.FullScreen = fullScreenBox.Checked;
+            settings.LowLatency = lowLatencyBox.Checked;
             settings.Audio = audioBox.Checked;
             settings.AudioSink = Settings.AudioOutputs[audioOutputBox.SelectedIndex].Sink;
             settings.RequirePin = pinBox.Checked;
