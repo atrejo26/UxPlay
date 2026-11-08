@@ -29,11 +29,19 @@ namespace UxPlayTray
             ("30 fps - for older PCs or slow Wi-Fi", 30),
         };
 
+        public static readonly (string Label, string Sink)[] AudioOutputs =
+        {
+            ("Automatic (recommended)", ""),
+            ("Windows audio (WASAPI)", "wasapisink"),
+            ("Compatibility mode (DirectSound)", "directsoundsink"),
+        };
+
         public string Name = Environment.MachineName;
         public bool FullScreen = false;
         public string Resolution = "";
         public int Fps = 60;
         public bool Audio = true;
+        public string AudioSink = "";
         public bool RequirePin = false;
         public string ExtraArgs = "";
 
@@ -65,6 +73,7 @@ namespace UxPlayTray
                     case "resolution": s.Resolution = val; break;
                     case "fps": if (int.TryParse(val, out int fps) && fps > 0 && fps <= 60) s.Fps = fps; break;
                     case "audio": s.Audio = val != "0"; break;
+                    case "audiosink": if (Array.Exists(AudioOutputs, o => o.Sink == val)) s.AudioSink = val; break;
                     case "pin": s.RequirePin = val == "1"; break;
                     case "extra": s.ExtraArgs = val; break;
                 }
@@ -86,6 +95,7 @@ namespace UxPlayTray
                 "resolution=" + Resolution,
                 "fps=" + Fps,
                 "audio=" + (Audio ? "1" : "0"),
+                "audiosink=" + AudioSink,
                 "pin=" + (RequirePin ? "1" : "0"),
                 "extra=" + ExtraArgs,
             };
@@ -124,6 +134,8 @@ namespace UxPlayTray
             args.Add("-fps " + Fps);
             if (!Audio)
                 args.Add("-as 0");
+            else if (AudioSink.Length > 0 && !HasOption("-as"))
+                args.Add("-as " + AudioSink);
             if (RequirePin)
                 args.Add("-pin -reg " + Quote(Path.Combine(DataDir, "uxplay.register")));
             if (ExtraArgs.Length > 0)
@@ -132,8 +144,11 @@ namespace UxPlayTray
         }
 
         /// <summary>True when the Advanced options pick their own video output (-vs).</summary>
-        public bool HasOwnVideoSink =>
-            (" " + ExtraArgs + " ").IndexOf(" -vs ", StringComparison.Ordinal) >= 0;
+        public bool HasOwnVideoSink => HasOption("-vs");
+
+        /// <summary>True when the Advanced options contain this uxplay option.</summary>
+        bool HasOption(string option) =>
+            (" " + ExtraArgs + " ").IndexOf(" " + option + " ", StringComparison.Ordinal) >= 0;
 
         public static string CleanName(string name)
         {
@@ -158,7 +173,7 @@ namespace UxPlayTray
             {
                 using var key = Registry.CurrentUser.CreateSubKey(RunKey);
                 if (value)
-                    key.SetValue(RunValue, "\"" + System.Windows.Forms.Application.ExecutablePath + "\"");
+                    key.SetValue(RunValue, "\"" + System.Reflection.Assembly.GetEntryAssembly().Location + "\"");
                 else
                     key.DeleteValue(RunValue, false);
             }

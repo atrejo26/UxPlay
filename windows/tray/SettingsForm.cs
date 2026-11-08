@@ -13,6 +13,7 @@ namespace UxPlayTray
         readonly ComboBox frameRateBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
         readonly CheckBox fullScreenBox = new CheckBox { Text = "Start in full screen (no borders) - switch any time with Alt+Enter", AutoSize = true };
         readonly CheckBox audioBox = new CheckBox { Text = "Play iPhone sound on this PC", AutoSize = true };
+        readonly ComboBox audioOutputBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
         readonly CheckBox pinBox = new CheckBox { Text = "Ask for a PIN the first time a new device connects", AutoSize = true };
         readonly CheckBox startupBox = new CheckBox { Text = "Start UxPlay when I sign in to Windows", AutoSize = true };
         readonly TextBox extraBox = new TextBox { Width = 260 };
@@ -38,6 +39,8 @@ namespace UxPlayTray
                 resolutionBox.Items.Add(r.Label);
             foreach (var f in Settings.FrameRates)
                 frameRateBox.Items.Add(f.Label);
+            foreach (var o in Settings.AudioOutputs)
+                audioOutputBox.Items.Add(o.Label);
 
             nameBox.Text = settings.Name;
             int index = Array.FindIndex(Settings.Resolutions, r => r.Size == settings.Resolution);
@@ -46,6 +49,10 @@ namespace UxPlayTray
             frameRateBox.SelectedIndex = fpsIndex >= 0 ? fpsIndex : 0;
             fullScreenBox.Checked = settings.FullScreen;
             audioBox.Checked = settings.Audio;
+            int audioIndex = Array.FindIndex(Settings.AudioOutputs, o => o.Sink == settings.AudioSink);
+            audioOutputBox.SelectedIndex = audioIndex >= 0 ? audioIndex : 0;
+            audioOutputBox.Enabled = audioBox.Checked;
+            audioBox.CheckedChanged += (s, e) => audioOutputBox.Enabled = audioBox.Checked;
             pinBox.Checked = settings.RequirePin;
             startupBox.Checked = Settings.StartWithWindows;
             extraBox.Text = settings.ExtraArgs;
@@ -62,6 +69,7 @@ namespace UxPlayTray
             AddRow(grid, "Smoothness:", frameRateBox);
             AddRow(grid, null, fullScreenBox);
             AddRow(grid, null, audioBox);
+            AddRow(grid, "Sound output:", audioOutputBox);
             AddRow(grid, null, pinBox);
             AddRow(grid, null, startupBox);
             AddRow(grid, "Advanced options:", extraBox);
@@ -110,6 +118,7 @@ namespace UxPlayTray
             settings.Fps = Settings.FrameRates[frameRateBox.SelectedIndex].Fps;
             settings.FullScreen = fullScreenBox.Checked;
             settings.Audio = audioBox.Checked;
+            settings.AudioSink = Settings.AudioOutputs[audioOutputBox.SelectedIndex].Sink;
             settings.RequirePin = pinBox.Checked;
             settings.ExtraArgs = extraBox.Text.Trim();
             try

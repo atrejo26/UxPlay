@@ -12,7 +12,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Product>UxPlay</Product>
     <Description>UxPlay AirPlay receiver</Description>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
 

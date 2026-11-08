@@ -1,3 +1,5 @@
 tray/bin/
 tray/obj/
 out/
+tests/bin/
+tests/obj/

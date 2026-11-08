@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Publish a GitHub Release with this new tag (e.g. v1.74-win2); leave empty to only build'
+        description: 'Publish a GitHub Release with this new tag (e.g. v1.74-win2; a tag with "beta" is a pre-release); leave empty to only build'
         required: false
         default: ''
 
@@ -58,6 +58,12 @@ jobs:
       - name: Bundle uxplay.exe with its DLLs and plugins
         run: windows/bundle.sh build windows/out/UxPlay
 
+      - name: Test tray app
+        shell: pwsh
+        run: |
+          dotnet test windows/tests/UxPlayTray.Tests.csproj
+          if ($LASTEXITCODE -ne 0) { throw "tray app tests failed" }
+
       - name: Build tray app
         shell: pwsh
         run: |
@@ -88,7 +94,7 @@ jobs:
           foreach ($e in 'appsrc','queue','h264parse','h265parse','decodebin','avdec_h264','avdec_h265',
                          'avdec_aac','avdec_alac','jpegdec','imagefreeze','textoverlay','videoflip',
                          'videoconvert','videoscale','autovideosink','d3d11videosink','autoaudiosink',
-                         'wasapisink','audioconvert','audioresample','volume') {
+                         'wasapisink','directsoundsink','audioconvert','audioresample','volume') {
             & $inspect --exists $e
             if ($LASTEXITCODE -ne 0) { $missing += $e }
           }
@@ -174,6 +180,8 @@ jobs:
           # a release created by hand on GitHub keeps the notes typed there
           name: ${{ inputs.release_tag != '' && format('UxPlay for Windows ({0})', inputs.release_tag) || '' }}
           body_path: ${{ inputs.release_tag != '' && 'windows/RELEASE_NOTES.md' || '' }}
+          # tags such as v1.74-win3-beta are published as a pre-release
+          prerelease: ${{ contains(env.RELEASE_TAG, 'beta') || contains(env.RELEASE_TAG, '-rc') }}
           files: |
             dist/UxPlay-Windows-installer/UxPlay-Setup.exe
             dist/UxPlay-Windows-portable.zip

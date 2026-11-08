@@ -21,12 +21,6 @@ namespace UxPlayTray
         static readonly string ServerExe = Path.Combine(ServerDir, "bin", "uxplay.exe");
         static readonly string LogPath = Path.Combine(Settings.DataDir, "uxplay.log");
 
-        static readonly Regex ConnectRequest = new Regex(@"connection request from (.+?) \((.*?)\) with deviceID");
-        // uxplay asks the iPhone for a code and prints it (pairing with "Ask for a PIN").
-        static readonly Regex PinRequest = new Regex(@"CLIENT MUST NOW ENTER PIN = ""(\d{4})""");
-        // Network connections from iPhones, to tell when the last one has gone.
-        static readonly Regex SocketOpened = new Regex(@"^Accepted IPv[46] client on socket (\d+)");
-        static readonly Regex SocketClosed = new Regex(@"^Connection closed on socket (\d+)");
 
         /// <summary>The app icon, shared by the tray and every window.</summary>
         internal static readonly Icon AppIcon = LoadIcon(null);
@@ -81,7 +75,9 @@ namespace UxPlayTray
                 new ToolStripSeparator(),
                 new ToolStripMenuItem("Troubleshooting", null,
                     new ToolStripMenuItem("Allow through Windows Firewall", null, (s, e) => FixFirewall()),
-                    new ToolStripMenuItem("Show log", null, (s, e) => ShowLog())),
+                    new ToolStripMenuItem("Show log", null, (s, e) => ShowLog()),
+                    new ToolStripMenuItem("Open UxPlay's data folder", null, (s, e) => OpenFolder(Settings.DataDir))),
+                new ToolStripMenuItem("About UxPlay / check for updates", null, (s, e) => ShowAbout()),
                 new ToolStripSeparator(),
                 new ToolStripMenuItem("Quit", null, (s, e) => Quit()),
             });
@@ -206,22 +202,22 @@ namespace UxPlayTray
             processLog.WriteLine(line);
 
             Match m;
-            if ((m = PinRequest.Match(line)).Success)
+            if ((m = OutputPatterns.PinRequest.Match(line)).Success)
             {
                 string pin = m.Groups[1].Value;
                 OnUi(() => ShowPin(pin));
             }
-            else if ((m = ConnectRequest.Match(line)).Success)
+            else if ((m = OutputPatterns.ConnectRequest.Match(line)).Success)
             {
                 string device = m.Groups[1].Value.Trim();
                 OnUi(() => OnConnected(device));
             }
-            else if ((m = SocketOpened.Match(line)).Success)
+            else if ((m = OutputPatterns.SocketOpened.Match(line)).Success)
             {
                 int socket = int.Parse(m.Groups[1].Value);
                 OnUi(() => openSockets.Add(socket));
             }
-            else if ((m = SocketClosed.Match(line)).Success)
+            else if ((m = OutputPatterns.SocketClosed.Match(line)).Success)
             {
                 int socket = int.Parse(m.Groups[1].Value);
                 OnUi(() =>
@@ -512,6 +508,36 @@ namespace UxPlayTray
             {
                 MessageBox.Show("Could not open the log:\n" + ex.Message + "\n\nIt is saved in:\n" + LogPath,
                     "UxPlay", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        const string ReleasesUrl = "https://github.com/atrejo26/UxPlay/releases";
+
+        static string Version =>
+            typeof(TrayApp).Assembly.GetName().Version.ToString(3);
+
+        void ShowAbout()
+        {
+            var answer = MessageBox.Show(
+                "UxPlay for Windows, version " + Version + "\n" +
+                "AirPlay receiver based on UxPlay 1.74 (GPL v3).\n\n" +
+                "Open the download page to check for a newer version?",
+                "About UxPlay", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+            if (answer == DialogResult.Yes)
+                OpenFolder(ReleasesUrl);
+        }
+
+        /// <summary>Opens a folder or web page with its default program.</summary>
+        static void OpenFolder(string target)
+        {
+            try
+            {
+                Directory.CreateDirectory(Settings.DataDir);
+                Process.Start(new ProcessStartInfo(target) { UseShellExecute = true })?.Dispose();
+            }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is IOException)
+            {
+                MessageBox.Show("Could not open " + target + ":\n" + ex.Message, "UxPlay");
             }
         }
 
