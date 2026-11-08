@@ -23,9 +23,16 @@ namespace UxPlayTray
             ("1440p (sharper, needs good Wi-Fi)", "2560x1440"),
         };
 
+        public static readonly (string Label, int Fps)[] FrameRates =
+        {
+            ("60 fps - smoothest (recommended)", 60),
+            ("30 fps - for older PCs or slow Wi-Fi", 30),
+        };
+
         public string Name = Environment.MachineName;
         public bool FullScreen = false;
         public string Resolution = "";
+        public int Fps = 60;
         public bool Audio = true;
         public bool RequirePin = false;
         public string ExtraArgs = "";
@@ -47,6 +54,7 @@ namespace UxPlayTray
                     case "name": if (val.Length > 0) s.Name = val; break;
                     case "fullscreen": s.FullScreen = val == "1"; break;
                     case "resolution": s.Resolution = val; break;
+                    case "fps": if (int.TryParse(val, out int fps) && fps > 0 && fps <= 60) s.Fps = fps; break;
                     case "audio": s.Audio = val != "0"; break;
                     case "pin": s.RequirePin = val == "1"; break;
                     case "extra": s.ExtraArgs = val; break;
@@ -67,6 +75,7 @@ namespace UxPlayTray
                 "name=" + Name,
                 "fullscreen=" + (FullScreen ? "1" : "0"),
                 "resolution=" + Resolution,
+                "fps=" + Fps,
                 "audio=" + (Audio ? "1" : "0"),
                 "pin=" + (RequirePin ? "1" : "0"),
                 "extra=" + ExtraArgs,
@@ -102,6 +111,8 @@ namespace UxPlayTray
             }
             if (Resolution.Length > 0)
                 args.Add("-s " + Resolution);
+            // uxplay asks the iPhone for at most 30 frames per second unless told otherwise.
+            args.Add("-fps " + Fps);
             if (!Audio)
                 args.Add("-as 0");
             if (RequirePin)

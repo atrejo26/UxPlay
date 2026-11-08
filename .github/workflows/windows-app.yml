@@ -90,7 +90,7 @@ jobs:
 
           # Start the receiver for a few seconds and make sure it comes up cleanly.
           # Same video output options the tray app passes, so a rejected option fails here.
-          $uxArgs = '-n CI -nh -vs "d3d11videosink fullscreen-toggle-mode=alt-enter+property fullscreen=true"'
+          $uxArgs = '-n CI -nh -fps 60 -vs "d3d11videosink fullscreen-toggle-mode=alt-enter+property fullscreen=true"'
           $p = Start-Process "$ux\bin\uxplay.exe" -ArgumentList $uxArgs -PassThru -NoNewWindow `
                  -RedirectStandardOutput "$env:RUNNER_TEMP\out.txt" -RedirectStandardError "$env:RUNNER_TEMP\err.txt"
           Start-Sleep -Seconds 15

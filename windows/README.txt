@@ -28,6 +28,14 @@ Right-click the UxPlay icon for:
     and starting UxPlay when you sign in to Windows
   - Troubleshooting: Windows Firewall fix and the log
 
+Smoother mirroring
+------------------
+  - Settings > Smoothness is 60 fps by default. Choose 30 fps on an
+    older PC or a weak Wi-Fi signal.
+  - Use your router's 5 GHz Wi-Fi, keep the iPhone near the router, and
+    connect the PC with an Ethernet cable if you can.
+  - If the picture stutters, set Settings > Quality to 720p.
+
 iPhone doesn't show this PC?
 ----------------------------
   - Check both are on the same Wi-Fi network (not a guest network).

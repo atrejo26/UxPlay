@@ -33,6 +33,15 @@ menu, to switch between a window and borderless full screen without
 disconnecting. Right-click the tray icon for settings (name, quality, sound,
 PIN, start with Windows), restart, the log and a Windows Firewall fix.
 
+### Smoother mirroring
+
+- **Settings → Smoothness** is 60 fps by default (UxPlay on its own asks the
+  iPhone for only 30). Pick 30 fps on an older PC or a weak Wi-Fi signal.
+- Wi-Fi matters most. Use your router's **5 GHz** network, keep the iPhone
+  near the router, and connect the PC with an **Ethernet cable** if you can.
+- If the picture stutters or freezes, set **Quality** to 720p.
+- Close heavy programs (games, video calls, big downloads) while mirroring.
+
 The installer adds a Windows Firewall rule for UxPlay on all network types,
 so the iPhone can find the PC even when Windows calls your home Wi-Fi
 "Public". On networks you don't trust, such as café Wi-Fi, quit UxPlay or
