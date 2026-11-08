@@ -725,3 +725,47 @@ public class BugReportEdgeCases
         Assert.Empty(BugReport.TailOfFile(System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid() + ".log"), 60));
     }
 }
+
+public class SettingsSaveEdgeCases
+{
+    [Fact]
+    public void SavingAgainReplacesTheFileAndLeavesNothingBehind()
+    {
+        string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "uxplay-save-" + Guid.NewGuid());
+        string path = System.IO.Path.Combine(dir, "settings.ini");
+        try
+        {
+            var store = new IniSettingsStore(path);
+            for (int i = 0; i < 20; i++)
+                store.Save(new Settings { Name = "PC " + i, Fps = 30 });
+            Assert.Equal("PC 19", store.Load().Name);
+            Assert.Equal(new[] { path }, System.IO.Directory.GetFiles(dir));  // no .new left over
+        }
+        finally
+        {
+            System.IO.Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public void AHalfWrittenFileFromAnEarlierCrashDoesntGetInTheWay()
+    {
+        string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "uxplay-save-" + Guid.NewGuid());
+        string path = System.IO.Path.Combine(dir, "settings.ini");
+        try
+        {
+            System.IO.Directory.CreateDirectory(dir);
+            var store = new IniSettingsStore(path);
+            store.Save(new Settings { Name = "Old" });
+            System.IO.File.WriteAllText(path + ".new", "name=Half");  // what a power cut mid-save leaves
+            Assert.Equal("Old", store.Load().Name);  // the settings that were saved still load
+            store.Save(new Settings { Name = "New" });
+            Assert.Equal("New", store.Load().Name);
+            Assert.False(System.IO.File.Exists(path + ".new"));
+        }
+        finally
+        {
+            System.IO.Directory.Delete(dir, true);
+        }
+    }
+}

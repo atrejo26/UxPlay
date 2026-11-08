@@ -95,7 +95,14 @@ namespace UxPlayTray
         public void Save(Settings settings)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path));
-            File.WriteAllLines(path, Format(settings), new UTF8Encoding(false));
+            // Write a new file and then swap it in, so a crash or power cut while
+            // saving leaves the old settings rather than half a file.
+            string temp = path + ".new";
+            File.WriteAllLines(temp, Format(settings), new UTF8Encoding(false));
+            if (File.Exists(path))
+                File.Replace(temp, path, null);
+            else
+                File.Move(temp, path);
         }
     }
 }
