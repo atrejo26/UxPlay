@@ -121,11 +121,13 @@ that picks the concrete classes.
 | `UxPlayCommandLine` | Turns `Settings` into uxplay options |
 | `IStartupRegistration` / `RunKeyStartup` | "Start UxPlay when I sign in" |
 | `IMirrorWindow` / `MirrorWindow` | Finds the video window and switches full screen |
+| `RestartPolicy` | Restarts a crashed `uxplay.exe`, at most 3 times in 10 minutes, then tells the user |
 | `OnTopWatcher` | "Keep on top": retries until the video window has opened, for up to 30 s |
 | `IKeepAwake` / `KeepAwake` | Keeps the screen on while mirroring |
 | `IFirewall` / `WindowsFirewall` | The Windows Firewall rule |
 | `SettingsForm`, `PinForm` | The Settings and PIN windows |
-| `LogFile`, `JobObject`, `AppPaths`, `AppIcon` | Small helpers |
+| `LogFile` | `uxplay.log`, written from two threads and kept under 5 MB |
+| `JobObject`, `AppPaths`, `AppIcon` | Small helpers |
 
 New features go in new classes, or new entries in the option tables in
 `Settings`, without changing the others. The Windows-free parts are covered by

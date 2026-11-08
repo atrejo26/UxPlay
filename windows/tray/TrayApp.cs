@@ -40,6 +40,7 @@ namespace UxPlayTray
         readonly IUpdateCheck updateCheck;
         readonly IPrompt prompt;
         readonly ConnectionMonitor connection = new ConnectionMonitor();
+        readonly RestartPolicy restartPolicy = new RestartPolicy();
 
         readonly NotifyIcon tray;
         readonly Icon readyIcon, connectedIcon, stoppedIcon;
@@ -277,6 +278,7 @@ namespace UxPlayTray
 
         void RestartReceiver()
         {
+            restartPolicy.Reset();
             StopReceiver();
             StartReceiver();
         }
@@ -286,15 +288,17 @@ namespace UxPlayTray
             if (receiver.IsRunning)
                 StopReceiver();
             else
+            {
+                restartPolicy.Reset();
                 StartReceiver();
+            }
         }
 
         void OnReceiverExited(int code)
         {
             ResetConnection();
-            // Unexpected exit: restart automatically if it had been running a while,
-            // otherwise something is wrong with the setup, so tell the user.
-            if (receiver.Uptime.TotalSeconds > 20)
+            var decision = restartPolicy.Decide(receiver.Uptime, DateTime.Now);
+            if (decision == RestartDecision.Restart)
             {
                 // Keep the log of the copy that stopped, for troubleshooting.
                 try
@@ -307,8 +311,11 @@ namespace UxPlayTray
                 return;
             }
             SetStatus("Stopped (error)");
-            var answer = MessageBox.Show(
-                "UxPlay stopped unexpectedly (exit code " + code + ").\n\nOpen the log to see what went wrong?",
+            string what = decision == RestartDecision.StopsTooOften
+                ? "UxPlay keeps stopping unexpectedly (" + RestartPolicy.MaxRestarts + " times in a few minutes, last exit code " + code +
+                  "), so it hasn't been restarted again.\n\nRight-click the UxPlay icon and choose Start to try again."
+                : "UxPlay stopped unexpectedly (exit code " + code + ").";
+            var answer = MessageBox.Show(what + "\n\nOpen the log to see what went wrong?",
                 "UxPlay", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
             if (answer == DialogResult.Yes)
                 ShowLog();

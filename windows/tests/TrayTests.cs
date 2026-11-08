@@ -588,3 +588,53 @@ public class OnTopWatcherTests
         Assert.Equal(0, window.Tries);
     }
 }
+
+public class RestartPolicyTests
+{
+    static readonly System.DateTime T0 = new System.DateTime(2026, 1, 1, 20, 0, 0);
+
+    [Fact]
+    public void ACrashAfterRunningAWhileIsRestarted() =>
+        Assert.Equal(RestartDecision.Restart, new RestartPolicy().Decide(System.TimeSpan.FromHours(2), T0));
+
+    [Fact]
+    public void ACrashRightAtStartIsReported() =>
+        Assert.Equal(RestartDecision.StoppedAtStart, new RestartPolicy().Decide(System.TimeSpan.FromSeconds(3), T0));
+}
+
+public class LogFileTests
+{
+    static string TempLog() => Path.Combine(Path.GetTempPath(), "uxplay-test-" + System.Guid.NewGuid() + ".log");
+
+    [Fact]
+    public void WritesTheHeaderAndLines()
+    {
+        string path = TempLog();
+        using (var log = new LogFile(path, "> uxplay.exe -n PC", append: false))
+        {
+            log.WriteLine("Initialized server socket(s)");
+        }
+        Assert.Equal(new[] { "> uxplay.exe -n PC", "Initialized server socket(s)" }, File.ReadAllLines(path));
+        File.Delete(path);
+    }
+
+    [Fact]
+    public void AppendKeepsTheEarlierRun()
+    {
+        string path = TempLog();
+        using (var log = new LogFile(path, "run 1", append: false)) log.WriteLine("a");
+        using (var log = new LogFile(path, "run 2", append: true)) log.WriteLine("b");
+        Assert.Equal(new[] { "run 1", "a", "run 2", "b" }, File.ReadAllLines(path));
+        File.Delete(path);
+    }
+
+    [Fact]
+    public void ANewRunReplacesTheOldLog()
+    {
+        string path = TempLog();
+        using (var log = new LogFile(path, "run 1", append: false)) log.WriteLine("a");
+        using (var log = new LogFile(path, "run 2", append: false)) { }
+        Assert.Equal(new[] { "run 2" }, File.ReadAllLines(path));
+        File.Delete(path);
+    }
+}

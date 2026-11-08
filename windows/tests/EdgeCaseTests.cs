@@ -443,3 +443,145 @@ public class OnTopWatcherEdgeCases
         Assert.Equal(0, window.Tries);
     }
 }
+
+public class RestartPolicyEdgeCases
+{
+    static readonly DateTime T0 = new DateTime(2026, 1, 1, 20, 0, 0);
+    static readonly TimeSpan LongRun = TimeSpan.FromMinutes(1);
+
+    [Fact]
+    public void ACrashLoopIsStoppedAfterThreeRestarts()
+    {
+        var p = new RestartPolicy();
+        for (int i = 0; i < RestartPolicy.MaxRestarts; i++)
+            Assert.Equal(RestartDecision.Restart, p.Decide(LongRun, T0.AddMinutes(i)));
+        Assert.Equal(RestartDecision.StopsTooOften, p.Decide(LongRun, T0.AddMinutes(3)));
+        Assert.Equal(RestartDecision.StopsTooOften, p.Decide(LongRun, T0.AddMinutes(4)));  // and stays stopped
+    }
+
+    [Fact]
+    public void OldCrashesAreForgotten()
+    {
+        var p = new RestartPolicy();
+        for (int i = 0; i < RestartPolicy.MaxRestarts; i++)
+            p.Decide(LongRun, T0.AddMinutes(i));
+        // ten minutes after the first crash it no longer counts
+        Assert.Equal(RestartDecision.Restart, p.Decide(LongRun, T0 + RestartPolicy.Period));
+    }
+
+    [Fact]
+    public void OneCrashADayIsAlwaysRestarted()
+    {
+        var p = new RestartPolicy();
+        for (int day = 0; day < 365; day++)
+            Assert.Equal(RestartDecision.Restart, p.Decide(TimeSpan.FromHours(20), T0.AddDays(day)));
+    }
+
+    [Fact]
+    public void StartingAgainByHandGivesAFreshAllowance()
+    {
+        var p = new RestartPolicy();
+        for (int i = 0; i <= RestartPolicy.MaxRestarts; i++)
+            p.Decide(LongRun, T0.AddMinutes(i));
+        p.Reset();
+        Assert.Equal(RestartDecision.Restart, p.Decide(LongRun, T0.AddMinutes(5)));
+    }
+
+    [Theory]
+    [InlineData(20, false)]   // exactly the limit is still "at start"
+    [InlineData(21, true)]
+    [InlineData(0, false)]
+    public void TheStartLimit(int seconds, bool restarted) =>
+        Assert.Equal(restarted ? RestartDecision.Restart : RestartDecision.StoppedAtStart,
+            new RestartPolicy().Decide(TimeSpan.FromSeconds(seconds), T0));
+
+    [Fact]
+    public void ACrashAtStartDoesNotUseUpTheAllowance()
+    {
+        var p = new RestartPolicy();
+        for (int i = 0; i < 10; i++)
+            p.Decide(TimeSpan.FromSeconds(1), T0.AddMinutes(i));
+        Assert.Equal(RestartDecision.Restart, p.Decide(LongRun, T0.AddMinutes(10)));
+    }
+
+    [Fact]
+    public void TheClockGoingBackDoesNotBreakIt()
+    {
+        // Windows corrected the time, or daylight saving ended
+        var p = new RestartPolicy();
+        p.Decide(LongRun, T0);
+        Assert.Equal(RestartDecision.Restart, p.Decide(LongRun, T0.AddHours(-1)));
+        Assert.Equal(RestartDecision.Restart, p.Decide(LongRun, T0.AddHours(-1).AddMinutes(1)));
+        Assert.Equal(RestartDecision.StopsTooOften, p.Decide(LongRun, T0.AddHours(-1).AddMinutes(2)));
+    }
+}
+
+public class LogFileEdgeCases
+{
+    static string TempLog() => System.IO.Path.Combine(System.IO.Path.GetTempPath(), "uxplay-test-" + Guid.NewGuid() + ".log");
+
+    [Fact]
+    public void AHugeLogStartsAgainInsteadOfFillingTheDisk()
+    {
+        string path = TempLog();
+        string line = new string('x', 1000);
+        using (var log = new LogFile(path, "header", append: false))
+            for (int i = 0; i < 6000; i++)   // about 6 MB, over the 5 MB limit
+                log.WriteLine(line);
+        var lines = System.IO.File.ReadAllLines(path);
+        Assert.Equal("header", lines[0]);
+        Assert.Equal("(older messages were removed to keep this log small)", lines[1]);
+        Assert.True(new System.IO.FileInfo(path).Length < 6 * 1024 * 1024);
+        System.IO.File.Delete(path);
+    }
+
+    [Fact]
+    public void AHugeOldLogIsNotAppendedTo()
+    {
+        string path = TempLog();
+        System.IO.File.WriteAllText(path, new string('x', 6 * 1024 * 1024));
+        using (var log = new LogFile(path, "new run", append: true)) { }
+        Assert.Equal(new[] { "new run" }, System.IO.File.ReadAllLines(path));
+        System.IO.File.Delete(path);
+    }
+
+    [Fact]
+    public void AnUnwritableLogIsSkippedNotFatal()
+    {
+        // the folder doesn't exist: UxPlay must keep working without a log
+        string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString(), "no", "uxplay.log");
+        using (var log = new LogFile(path, "header", append: true))
+            log.WriteLine("still fine");
+        Assert.False(System.IO.File.Exists(path));
+    }
+
+    [Fact]
+    public void WritingAfterCloseIsIgnored()
+    {
+        string path = TempLog();
+        var log = new LogFile(path, "header", append: false);
+        log.Dispose();
+        log.WriteLine("late line from a reader thread");
+        log.Dispose();
+        Assert.Equal(new[] { "header" }, System.IO.File.ReadAllLines(path));
+        System.IO.File.Delete(path);
+    }
+
+    [Fact]
+    public void TwoThreadsWritingAtOnceLoseNothing()
+    {
+        // stdout and stderr are read on two threads
+        string path = TempLog();
+        using (var log = new LogFile(path, "header", append: false))
+        {
+            var a = new System.Threading.Thread(() => { for (int i = 0; i < 5000; i++) log.WriteLine("out " + i); });
+            var b = new System.Threading.Thread(() => { for (int i = 0; i < 5000; i++) log.WriteLine("err " + i); });
+            a.Start(); b.Start(); a.Join(); b.Join();
+        }
+        var lines = System.IO.File.ReadAllLines(path);
+        Assert.Equal(10001, lines.Length);
+        Assert.Equal(5000, lines.Count(l => l.StartsWith("out ")));
+        Assert.All(lines.Skip(1), l => Assert.Matches(@"^(out|err) \d+$", l));
+        System.IO.File.Delete(path);
+    }
+}
