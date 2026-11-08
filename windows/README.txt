@@ -44,5 +44,15 @@ iPhone doesn't show this PC?
   - Still stuck: quit UxPlay, run uxplay\uxplay-console.bat and read
     the messages it prints.
 
+No sound from the PC?
+---------------------
+  - Right-click the UxPlay icon > Settings: tick "Play iPhone sound on this PC".
+  - While mirroring, the iPhone's volume buttons set the PC's volume: turn
+    it up. Some apps and games stay quiet in Silent mode, so test with a video.
+  - Open Windows' Volume mixer while sound plays: uxplay.exe should be listed
+    and not muted, on the speakers you expect.
+  - Using ESET, Norton or another firewall? Allow uxplay.exe there for both
+    TCP and UDP. The picture uses TCP but the sound uses UDP.
+
 UxPlay is open-source software (GPL v3); see uxplay\LICENSE.txt.
 Source code: https://github.com/atrejo26/UxPlay

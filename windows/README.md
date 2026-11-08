@@ -50,6 +50,17 @@ so the iPhone can find the PC even when Windows calls your home Wi-Fi
 "Public". On networks you don't trust, such as café Wi-Fi, quit UxPlay or
 turn on **Ask for a PIN** in Settings.
 
+### No sound?
+
+- In **Settings**, tick **Play iPhone sound on this PC**.
+- While mirroring, the iPhone's volume buttons set the PC's volume, so turn it
+  up. Some apps and games stay quiet in Silent mode, so test with a video.
+- Open Windows' **Volume mixer** while sound plays. `uxplay.exe` should be
+  listed, not muted, and on the speakers you expect.
+- With a third-party firewall (ESET, Norton and so on), allow `uxplay.exe` for
+  both **TCP and UDP**. The picture arrives over TCP but the sound over UDP,
+  so a TCP-only rule gives you video with no sound.
+
 ## What's in this folder
 
 | Path | What it is |
