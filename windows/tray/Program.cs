@@ -10,8 +10,12 @@ namespace UxPlayTray
         internal const string ShowEventName = @"Local\UxPlayTray.ShowHelp";
 
         [STAThread]
-        static void Main()
+        static int Main(string[] args)
         {
+            // "Allow through Windows Firewall": the copy Windows started as administrator
+            if (args.Length == 1 && args[0] == FirewallRule.ElevatedSwitch)
+                return WindowsFirewall.ApplyElevated(AppPaths.ServerExe);
+
             using var mutex = new Mutex(true, MutexName, out bool firstInstance);
             if (!firstInstance)
             {
@@ -24,7 +28,7 @@ namespace UxPlayTray
                 catch (WaitHandleCannotBeOpenedException)
                 {
                 }
-                return;
+                return 0;
             }
 
             Application.EnableVisualStyles();
@@ -42,7 +46,8 @@ namespace UxPlayTray
                 Startup = new RunKeyStartup(Application.ExecutablePath),
                 MirrorWindow = new MirrorWindow(),
                 KeepAwake = new KeepAwake(),
-                Firewall = new WindowsFirewall(),
+                Firewall = new WindowsFirewall(Application.ExecutablePath),
+                NetworkProfiles = new WmiNetworkProfiles(),
                 SoundTest = new GStreamerSoundTest(AppPaths.ServerDir, AppPaths.DataDir),
                 UpdateCheck = new GitHubUpdateCheck("atrejo26/UxPlay"),
                 Prompt = new MessageBoxPrompt(),
@@ -51,6 +56,7 @@ namespace UxPlayTray
             using (var app = new TrayApp(services))
                 Application.Run(app);
             GC.KeepAlive(mutex);
+            return 0;
         }
 
         /// <summary>Saves an unexpected error for troubleshooting and tells the user.</summary>

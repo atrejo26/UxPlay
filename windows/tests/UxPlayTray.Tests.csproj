@@ -19,7 +19,7 @@
   <PropertyGroup>
     <CollectCoverage>true</CollectCoverage>
     <IncludeTestAssembly>true</IncludeTestAssembly>
-    <ExcludeByFile>**/TrayTests.cs%3b**/EdgeCaseTests.cs%3b**/Microsoft.NET.Test.Sdk.Program.cs</ExcludeByFile>
+    <ExcludeByFile>**/TrayTests.cs%3b**/EdgeCaseTests.cs%3b**/SecurityTests.cs%3b**/SecurityEdgeCaseTests.cs%3b**/Microsoft.NET.Test.Sdk.Program.cs</ExcludeByFile>
     <Threshold>95%2c90</Threshold>
     <ThresholdType>line,branch</ThresholdType>
     <ThresholdStat>total</ThresholdStat>
@@ -44,6 +44,8 @@
     <Compile Include="../tray/ScreenshotName.cs" Link="ScreenshotName.cs" />
     <Compile Include="../tray/ErrorLog.cs" Link="ErrorLog.cs" />
     <Compile Include="../tray/BugReport.cs" Link="BugReport.cs" />
+    <Compile Include="../tray/Firewall.cs" Link="Firewall.cs" />
+    <Compile Include="../tray/NetworkProfiles.cs" Link="NetworkProfiles.cs" />
   </ItemGroup>
 
   <ItemGroup>

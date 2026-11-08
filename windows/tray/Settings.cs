@@ -37,7 +37,7 @@ namespace UxPlayTray
         public int Fps = 60;
         public bool Audio = true;
         public string AudioSink = "";
-        public bool RequirePin = false;
+        public bool RequirePin = true;  // only someone who can see this screen can connect
         public string ExtraArgs = "";
         public bool CheckForUpdates = true;
         public bool KeepOnTop = false;

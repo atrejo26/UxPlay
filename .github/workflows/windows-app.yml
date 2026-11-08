@@ -26,6 +26,11 @@ concurrency:
   group: windows-app-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')) }}
 
+# Read-only unless a job needs more (only the release job may write, to publish).
+# Actions are pinned to exact commits so a moved tag can't change what runs here.
+permissions:
+  contents: read
+
 jobs:
   windows-app:
     runs-on: windows-latest
@@ -34,11 +39,11 @@ jobs:
         shell: msys2 {0}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
 
       - name: Install MSYS2 and dependencies
         id: msys2
-        uses: msys2/setup-msys2@v2
+        uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e  # v2
         with:
           msystem: UCRT64
           update: true
@@ -59,9 +64,27 @@ jobs:
             mingw-w64-ucrt-x86_64-ntldd
 
       - name: Build uxplay.exe
+        # NO_MARCH_NATIVE: build for any x86-64 PC, not just this runner's CPU.
+        # Hardening: stack protector, checked string/memory functions, and ASLR/DEP.
+        env:
+          CFLAGS: -fstack-protector-strong -D_FORTIFY_SOURCE=2
+          CXXFLAGS: -fstack-protector-strong -D_FORTIFY_SOURCE=2
+          LDFLAGS: -fstack-protector-strong -Wl,--dynamicbase -Wl,--nxcompat -Wl,--high-entropy-va
         run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DNO_X11_DEPS=ON
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DNO_X11_DEPS=ON -DNO_MARCH_NATIVE=ON
           cmake --build build
+          grep -q -- "-march=native" build/build.ninja && { echo "uxplay.exe must not be built with -march=native"; exit 1; } || true
+
+      - name: Check uxplay.exe is hardened
+        run: |
+          flags=$(objdump -p build/uxplay.exe | sed -n '/DllCharacteristics/,/SizeOfStackReserve/p')
+          echo "$flags"
+          for f in DYNAMIC_BASE NX_COMPAT HIGH_ENTROPY_VA; do
+            grep -q "$f" <<<"$flags" || { echo "uxplay.exe is missing $f"; exit 1; }
+          done
+          for f in -fstack-protector-strong -D_FORTIFY_SOURCE=2; do
+            grep -q -- "$f" build/build.ninja || { echo "uxplay.exe was not compiled with $f"; exit 1; }
+          done
 
       - name: Bundle uxplay.exe with its DLLs and plugins
         run: windows/bundle.sh build windows/out/UxPlay
@@ -144,7 +167,7 @@ jobs:
           if ($log -notmatch 'mDNS: advertising on \d+\.\d+\.\d+\.\d+') { throw "uxplay.exe did not find a network address to advertise" }
 
       - name: Upload portable app
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: UxPlay-Windows-portable
           path: windows/out/UxPlay
@@ -163,7 +186,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed ($LASTEXITCODE)" }
 
       - name: Upload installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: UxPlay-Windows-installer
           path: windows/out/UxPlay-Setup.exe
@@ -183,24 +206,28 @@ jobs:
       - name: Check release tag
         if: inputs.release_tag != ''
         run: |
-          case "$RELEASE_TAG" in
-            v*) ;;
-            *) echo "release_tag must start with v, got: $RELEASE_TAG"; exit 1 ;;
-          esac
+          # v, then letters, digits, dots and dashes only (e.g. v1.74-win3-beta)
+          [[ "$RELEASE_TAG" =~ ^v[0-9][0-9A-Za-z.-]{0,40}$ ]] || { echo "release_tag must look like v1.74-win3, got: $RELEASE_TAG"; exit 1; }
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
 
       - name: Download builds
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
         with:
           path: dist
 
       - name: Package portable zip
         run: cd dist/UxPlay-Windows-portable && zip -qr ../UxPlay-Windows-portable.zip .
 
+      - name: Checksums
+        # lets anyone check a download wasn't changed: certutil -hashfile UxPlay-Setup.exe SHA256
+        run: |
+          cp dist/UxPlay-Windows-installer/UxPlay-Setup.exe dist/
+          cd dist && sha256sum UxPlay-Setup.exe UxPlay-Windows-portable.zip | tee SHA256SUMS.txt
+
       - name: Publish release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           target_commitish: ${{ github.sha }}
@@ -210,5 +237,6 @@ jobs:
           # tags such as v1.74-win3-beta are published as a pre-release
           prerelease: ${{ contains(env.RELEASE_TAG, 'beta') || contains(env.RELEASE_TAG, '-rc') }}
           files: |
-            dist/UxPlay-Windows-installer/UxPlay-Setup.exe
+            dist/UxPlay-Setup.exe
             dist/UxPlay-Windows-portable.zip
+            dist/SHA256SUMS.txt
