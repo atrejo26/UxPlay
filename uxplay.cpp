@@ -3383,7 +3383,21 @@ int main (int argc, char *argv[]) {
                 std::replace(lang_system.begin(), lang_system.end(), '_', '-');
             }
         }
-        g_assert(!lang_system.empty());
+#ifdef _WIN32
+        if (lang_system.empty()) {
+            /* Windows doesn't set LANG: use the user's display language, e.g. "en-US" */
+            wchar_t locale_name[LOCALE_NAME_MAX_LENGTH];
+            if (GetUserDefaultLocaleName(locale_name, LOCALE_NAME_MAX_LENGTH) > 0) {
+                char utf8[LOCALE_NAME_MAX_LENGTH * 4];
+                if (WideCharToMultiByte(CP_UTF8, 0, locale_name, -1, utf8, sizeof(utf8), NULL, NULL) > 0) {
+                    lang_system = utf8;
+                }
+            }
+        }
+#endif
+        if (lang_system.empty()) {
+            lang_system = "en";  /* nothing set at all: don't refuse to start */
+        }
     }
 
 #ifdef _WIN32    /*  use utf-8 terminal output; don't buffer stdout in WIN32 when debug_log = false */
