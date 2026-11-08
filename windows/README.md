@@ -17,7 +17,8 @@ GitHub builds it automatically with the **Windows App** workflow
   it anywhere and double-click `UxPlay.exe`.
 - **Releases:** to publish both files on the repository's **Releases** page,
   open **Actions → Windows App → Run workflow**, choose `master`, enter a new
-  tag such as `v1.74-win2` and click **Run workflow**. The release notes come
+  tag such as `v1.74-win2` and click **Run workflow**. A tag containing `beta`
+  (for example `v1.74-win3-beta`) is published as a pre-release. The release notes come
   from `windows/RELEASE_NOTES.md`, so update its "What's new" section first.
   Pushing a tag that starts with `v`, or creating a release on GitHub, also
   works; a release created by hand keeps the notes typed there.
@@ -65,6 +66,8 @@ turn on **Ask for a PIN** in Settings.
 - With a third-party firewall (ESET, Norton and so on), allow `uxplay.exe` for
   both **TCP and UDP**. The picture arrives over TCP but the sound over UDP,
   so a TCP-only rule gives you video with no sound.
+- Still nothing? In **Settings → Sound output**, try *Windows audio (WASAPI)*,
+  then *Compatibility mode (DirectSound)*.
 
 ## What's in this folder
 
@@ -76,6 +79,7 @@ turn on **Ask for a PIN** in Settings.
 | `RELEASE_NOTES.md` | Notes used for releases published from the Actions tab. |
 | `installer.iss` | Inno Setup script for `UxPlay-Setup.exe`: shortcuts, firewall rule, optional start at sign-in, uninstaller. |
 | `README.txt` | Quick-start guide shipped inside the app folder. |
+| `tests/` | Unit tests for the tray app's settings and log parsing: `dotnet test windows/tests`. |
 | `tools/make_icon.py` | Draws `tray/uxplay.ico` (needs Pillow). |
 
 Files the app keeps on the PC are in `%LOCALAPPDATA%\UxPlay`: `settings.ini`,

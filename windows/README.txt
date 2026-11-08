@@ -55,6 +55,8 @@ No sound from the PC?
     and not muted, on the speakers you expect.
   - Using ESET, Norton or another firewall? Allow uxplay.exe there for both
     TCP and UDP. The picture uses TCP but the sound uses UDP.
+  - Still nothing: Settings > Sound output, try "Windows audio (WASAPI)",
+    then "Compatibility mode (DirectSound)".
 
 UxPlay is open-source software (GPL v3); see uxplay\LICENSE.txt.
 Source code: https://github.com/atrejo26/UxPlay
