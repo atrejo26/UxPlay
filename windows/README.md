@@ -97,7 +97,7 @@ turn on **Ask for a PIN** in Settings.
 | `RELEASE_NOTES.md` | Notes used for releases published from the Actions tab. |
 | `installer.iss` | Inno Setup script for `UxPlay-Setup.exe`: shortcuts, firewall rule, optional start at sign-in, uninstaller. |
 | `README.txt` | Quick-start guide shipped inside the app folder. |
-| `tests/` | Unit tests for the tray app's settings and log parsing: `dotnet test windows/tests`. |
+| `tests/` | Unit tests for the tray app's logic, with a coverage minimum: `dotnet test windows/tests`. |
 | `tools/make_icon.py` | Draws `tray/uxplay.ico` (needs Pillow). |
 
 ### How the tray app is organised
@@ -112,6 +112,7 @@ that picks the concrete classes.
 | `IReceiver` / `ReceiverProcess` | Starts and stops `uxplay.exe` with the bundled GStreamer; its log; job object |
 | `GStreamerEnvironment` | Points the bundled GStreamer programs at the bundled plugins |
 | `ISoundTest` / `GStreamerSoundTest` | Plays the test beep through the chosen sound output |
+| `SoundTroubleshooter`, `IPrompt` / `MessageBoxPrompt` | The test-sound questions and advice; message boxes |
 | `ReleaseTag`, `IUpdateCheck` / `GitHubUpdateCheck` | Compares release tags; asks GitHub for the newest release once per start |
 | `ConnectionMonitor` | Reads uxplay's messages: PIN asked, iPhone connected, iPhone gone |
 | `OutputPatterns` | The uxplay messages it recognises |
@@ -128,6 +129,23 @@ that picks the concrete classes.
 New features go in new classes, or new entries in the option tables in
 `Settings`, without changing the others. The Windows-free parts are covered by
 `windows/tests`.
+
+### Tests and coverage
+
+`dotnet test windows/tests` runs the unit tests and measures their code
+coverage (coverlet); the Windows App workflow runs it on every push. The run
+fails if line or branch coverage of the tested files falls below **90%**, so
+new logic needs tests with it. The report is written to
+`windows/tests/TestResults/coverage.cobertura.xml`.
+
+What is measured is the logic that doesn't need Windows: settings, the uxplay
+command line, reading uxplay's messages, release tags, the GStreamer
+environment and the sound-test steps. Code that only starts a real program or
+talks to the network is marked `[ExcludeFromCodeCoverage]`; the Windows build
+runs it for real (bundle check, test sound, smoke test). The windows and the
+tray menu (`TrayApp`, `SettingsForm`, `PinForm`, `MirrorWindow` and the other
+Win32 helpers) are thin layers over Windows and are checked by building them
+and by the smoke test, not by unit tests.
 
 Files the app keeps on the PC are in `%LOCALAPPDATA%\UxPlay`: `settings.ini`,
 `uxplay.log`, the receiver's key `uxplay.pem` (so the iPhone recognises the PC

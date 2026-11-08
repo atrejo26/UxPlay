@@ -515,3 +515,34 @@ public class NewerReleaseTests
         Assert.Equal(expected, await new FixedUpdateCheck(latest).NewerReleaseAsync(current));
     }
 }
+
+public class GStreamerEnvironmentTests
+{
+    [Fact]
+    public void UsesOnlyTheBundledGStreamer()
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo("x");
+        psi.EnvironmentVariables["GST_PLUGIN_PATH"] = "C:\\other";
+        psi.EnvironmentVariables["GST_PLUGIN_PATH_1_0"] = "C:\\other";
+        GStreamerEnvironment.Apply(psi, "S", "D");
+        var env = psi.EnvironmentVariables;
+        Assert.StartsWith(Path.Combine("S", "bin") + ";", env["PATH"]);
+        Assert.Equal(Path.Combine("S", "lib", "gstreamer-1.0"), env["GST_PLUGIN_SYSTEM_PATH_1_0"]);
+        Assert.Equal(Path.Combine("D", "gst-registry.bin"), env["GST_REGISTRY_1_0"]);
+        Assert.Equal(Path.Combine("S", "lib", "gio", "modules"), env["GIO_MODULE_DIR"]);
+        Assert.Equal("D", env["HOME"]);
+        Assert.False(env.ContainsKey("GST_PLUGIN_PATH"));
+        Assert.False(env.ContainsKey("GST_PLUGIN_PATH_1_0"));
+    }
+}
+
+public class UpdateCheckSetupTests
+{
+    [Fact]
+    public void AsksForTheLatestRelease() =>
+        Assert.Equal("https://api.github.com/repos/atrejo26/UxPlay/releases/latest",
+            new GitHubUpdateCheck("atrejo26/UxPlay").ApiUrl);
+
+    [Fact]
+    public void TestBuildIsNotARelease() => Assert.Null(ReleaseTag.Current);
+}

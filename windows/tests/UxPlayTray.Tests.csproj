@@ -11,6 +11,22 @@
     <NoWarn>$(NoWarn);CA1416</NoWarn>
   </PropertyGroup>
 
+  <!-- Code coverage of the tray app's logic, measured on every "dotnet test". The tray
+       sources are compiled into this test assembly, so it is measured and the tests
+       themselves are left out. Code that only starts real programs or talks to the
+       network is marked [ExcludeFromCodeCoverage] and checked by the Windows build.
+       The run fails when line or branch coverage falls below the minimum. -->
+  <PropertyGroup>
+    <CollectCoverage>true</CollectCoverage>
+    <IncludeTestAssembly>true</IncludeTestAssembly>
+    <ExcludeByFile>**/TrayTests.cs%3b**/Microsoft.NET.Test.Sdk.Program.cs</ExcludeByFile>
+    <Threshold>90</Threshold>
+    <ThresholdType>line,branch</ThresholdType>
+    <ThresholdStat>total</ThresholdStat>
+    <CoverletOutputFormat>cobertura</CoverletOutputFormat>
+    <CoverletOutput>$(MSBuildThisFileDirectory)TestResults/</CoverletOutput>
+  </PropertyGroup>
+
   <ItemGroup>
     <Compile Include="../tray/Settings.cs" Link="Settings.cs" />
     <Compile Include="../tray/OutputPatterns.cs" Link="OutputPatterns.cs" />
@@ -24,6 +40,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="coverlet.msbuild" Version="6.0.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />

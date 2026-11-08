@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -54,6 +55,8 @@ namespace UxPlayTray
             return Task.Run(() => Play(sink));
         }
 
+        // Starts a real gst-launch: run by the Windows build's bundle check, not by the unit tests.
+        [ExcludeFromCodeCoverage]
         SoundTestResult Play(string sink)
         {
             Directory.CreateDirectory(dataDir);

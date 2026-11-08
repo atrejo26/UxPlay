@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Net;
 using System.Reflection;
@@ -86,6 +87,9 @@ namespace UxPlayTray
             latestReleaseApi = "https://api.github.com/repos/" + ownerAndRepo + "/releases/latest";
         }
 
+        /// <summary>The web address asked for the newest release.</summary>
+        public string ApiUrl => latestReleaseApi;
+
         static readonly Regex TagName = new Regex("\"tag_name\"\\s*:\\s*\"([^\"]+)\"", RegexOptions.CultureInvariant);
 
         /// <summary>The tag_name of a GitHub release as JSON, or null.</summary>
@@ -95,6 +99,8 @@ namespace UxPlayTray
             return m.Success ? m.Groups[1].Value : null;
         }
 
+        // Talks to GitHub, so the unit tests only cover ParseTag.
+        [ExcludeFromCodeCoverage]
         public Task<string> LatestReleaseTagAsync() => Task.Run(() =>
         {
             try
