@@ -355,10 +355,18 @@ ssize_t kernel_timestamp_session_recv(kernel_timestamp_session_t *session, char 
 #endif
     }
     //Fallback path if kernel timestamp could not be extracted; also used on MINGW64 systems or if recv_time_kernel == NULL
+
+    struct sockaddr *saddr = NULL;
+    socklen_t *saddrlen = NULL;
+    if (src_addr && addrlen) {
+        saddr = (struct sockaddr *) src_addr;
+        saddrlen = (socklen_t *) addrlen;
+    }
+    
 #ifdef _WIN32
-    int n = recvfrom(session->sock_fd, buf, (int) buf_len, 0, (struct sockaddr*) src_addr, (socklen_t *) &addrlen);
+    int n = recvfrom(session->sock_fd, buf, (int) buf_len, 0, saddr, saddrlen);
 #else
-    ssize_t n = recvfrom(session->sock_fd, buf, buf_len, 0, (struct sockaddr*) src_addr, (socklen_t *) &addrlen);
+    ssize_t n = recvfrom(session->sock_fd, buf, buf_len, 0, saddr, saddrlen);
 #endif
     if (recv_time_clock) {
         *recv_time_clock = 0;
@@ -657,7 +665,7 @@ raop_ntp_thread(void *arg) {
 
                 // Local timestamp of the client when the response message left the client  (should not equal t3_prev)
                 t3_raw = (q32_32_t) byteutils_get_long_be(response, 24);
-                byteutils_put_long_be(request, 8, (uint32_t) t3_raw);   //this is returned to client as client_ref
+                byteutils_put_long_be(request, 8, t3_raw);   //this is returned to client as client_ref
                 /* now adjust t3 to reset client epoch : don't include SECONDS_1900_TO_1970 */
                 t3 = raop_ntp_adjust_remote_timestamp_offset(raop_ntp, t3_raw, false);
 
@@ -815,6 +823,7 @@ raop_ntp_thread(void *arg) {
                         }
                         uint64_t root_distance_nsec = (uint64_t) (root_distance *1e9);
                         MUTEX_LOCK(raop_ntp->sync_params_mutex);
+                        raop_ntp->client_time_received = true;
                         raop_ntp->is_synced = is_synced;
                         raop_ntp->sync_offset = sync_offset;
                         raop_ntp->root_distance = root_distance_nsec;
@@ -972,10 +981,11 @@ uint64_t raop_ntp_get_local_time() {
  * Returns the current time in nano seconds according to the remote wall clock.
  */
 uint64_t raop_ntp_get_remote_time(raop_ntp_t *raop_ntp) {
+    MUTEX_LOCK(raop_ntp->sync_params_mutex);
     if  (!raop_ntp->client_time_received) {
+        MUTEX_UNLOCK(raop_ntp->sync_params_mutex);
         return 0;
     }
-    MUTEX_LOCK(raop_ntp->sync_params_mutex);
     int64_t offset = raop_ntp->sync_offset;
     MUTEX_UNLOCK(raop_ntp->sync_params_mutex);
     return (uint64_t) (((int64_t) raop_ntp_get_local_time()) + offset);
@@ -985,10 +995,11 @@ uint64_t raop_ntp_get_remote_time(raop_ntp_t *raop_ntp) {
  * Returns the local wall clock time in nano seconds for the given point in remote clock time
  */
 uint64_t raop_ntp_convert_remote_time(raop_ntp_t *raop_ntp, uint64_t remote_time) {
+    MUTEX_LOCK(raop_ntp->sync_params_mutex);
     if  (!raop_ntp->client_time_received) {
+        MUTEX_UNLOCK(raop_ntp->sync_params_mutex);
         return 0;
     }
-    MUTEX_LOCK(raop_ntp->sync_params_mutex);
     int64_t offset = raop_ntp->sync_offset;
     MUTEX_UNLOCK(raop_ntp->sync_params_mutex);
     return (uint64_t) (((int64_t) remote_time) - offset);
@@ -998,10 +1009,11 @@ uint64_t raop_ntp_convert_remote_time(raop_ntp_t *raop_ntp, uint64_t remote_time
  * Returns the remote wall clock time in nano seconds for the given point in local clock time
  */
 uint64_t raop_ntp_convert_local_time(raop_ntp_t *raop_ntp, uint64_t local_time) {
+    MUTEX_LOCK(raop_ntp->sync_params_mutex);
     if  (!raop_ntp->client_time_received) {
+        MUTEX_UNLOCK(raop_ntp->sync_params_mutex);
         return 0;
     }
-    MUTEX_LOCK(raop_ntp->sync_params_mutex);
     int64_t offset = raop_ntp->sync_offset;
     MUTEX_UNLOCK(raop_ntp->sync_params_mutex);
     return (uint64_t) (((int64_t) local_time) + offset);
@@ -1011,7 +1023,7 @@ uint64_t raop_ntp_convert_local_time(raop_ntp_t *raop_ntp, uint64_t local_time) 
 q32_32_t raop_ntp_adjust_remote_timestamp_offset(raop_ntp_t *raop_ntp, q32_32_t ntp_timestamp_raw, bool add_secs_1900_to_1970) {
     int64_t timestamp = (int64_t) ntp_timestamp_raw;
     if (add_secs_1900_to_1970) {
-        timestamp += ((int64_t) 2208988800ULL) << 32;
+        timestamp += (int64_t) (2208988800ULL << 32);
     }
     bool set_fixed_offset = false;
     if (!raop_ntp->have_fixed_offset) {

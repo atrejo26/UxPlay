@@ -44,6 +44,9 @@
 #include <unordered_map>
 #include <winsock2.h>
 #include <iphlpapi.h>
+#include <sddl.h>
+#include <io.h>
+#include <fcntl.h>
 #include <pthread.h>   //for pthreads in MSYS2 UCRT
 #else
 #include <csignal>
@@ -366,6 +369,86 @@ static void dbus_screensaver_inhibiter(bool inhibit) {
 }
 #endif
 
+
+/* helper function for writing user-only accesible files (unix permisions 600) */
+
+FILE* fopen600(const char* filename, const char* mode) {
+    if (!filename || !mode) return NULL;
+
+#if defined(_WIN32)
+    DWORD desiredAccess = 0;
+    DWORD creationDisposition = 0;
+    int openFlags = 0;
+
+    if (mode[0] == 'r') {
+        desiredAccess = GENERIC_READ;
+        creationDisposition = OPEN_EXISTING;
+        openFlags = _O_RDONLY;
+    } else if (mode[0] == 'w') {
+        desiredAccess = GENERIC_WRITE;
+        creationDisposition = CREATE_ALWAYS;
+        openFlags = _O_WRONLY;
+    } else if (mode[0] == 'a') {
+        desiredAccess = FILE_APPEND_DATA;
+        creationDisposition = OPEN_ALWAYS;
+        openFlags = _O_WRONLY | _O_APPEND;
+    } else {
+        return NULL;
+    }
+
+    // "D:P" breaks inheritance from parent folder.
+    // "(A;;GA;;;OW)" grants GENERIC_ALL (GA) to the Owner (OW).
+    // This gives the owner full control (Read, Write, and DELETE) while blocking others.
+    SECURITY_ATTRIBUTES sa = { sizeof(sa), NULL, FALSE };
+    if (!ConvertStringSecurityDescriptorToSecurityDescriptorA(
+            "D:P(A;;GA;;;OW)", 
+            SDDL_REVISION_1, 
+            &sa.lpSecurityDescriptor, 
+            NULL)) {
+        return NULL;
+    }
+
+    HANDLE hFile = CreateFileA(
+        filename, 
+        desiredAccess, 
+        0, // Exclusive lock while file handle is open
+        &sa, 
+        creationDisposition, 
+        FILE_ATTRIBUTE_NORMAL, 
+        NULL
+    );
+
+    LocalFree(sa.lpSecurityDescriptor);
+
+    if (hFile == INVALID_HANDLE_VALUE) return NULL;
+
+    int fd = _open_osfhandle(reinterpret_cast<intptr_t>(hFile), openFlags);
+    if (fd == -1) {
+        CloseHandle(hFile);
+        return NULL;
+    }
+
+    FILE* f = _fdopen(fd, mode);
+    if (!f) _close(fd);
+    return f;
+
+#else
+    int posixFlags = 0;
+    if (mode[0] == 'r')      posixFlags = O_RDONLY;
+    else if (mode[0] == 'w') posixFlags = O_WRONLY | O_CREAT | O_TRUNC;
+    else if (mode[0] == 'a') posixFlags = O_WRONLY | O_CREAT | O_APPEND;
+    else return NULL;
+
+    int fd = open(filename, posixFlags, S_IRUSR | S_IWUSR);
+    if (fd == -1) return NULL;
+
+    FILE* f = fdopen(fd, mode);
+    if (!f) close(fd);
+    return f;
+#endif
+}
+
+
 static bool file_has_write_access (const char * filename) {
     bool exists = false;
     bool write = false;
@@ -504,6 +587,7 @@ static char *create_pin_display(char *pin_str, int margin, int gap) {
         snprintf(pos, 2, "\n");
         pos++;
     }
+    free(pin);
     snprintf(pos, 2, "\n");
     return pin_image;
 }
@@ -1311,7 +1395,6 @@ void set_rpi_profile_string() {
     std::string v4l2slh265dec = "v4l2slh265dec";
     bool hw264 = gstreamer_decoder_check(v4l2h264dec.c_str());
     bool hw265 = gstreamer_decoder_check(v4l2slh265dec.c_str());
-
     /* AVC/H.264 */
     if (hw264) {
         switch (pi_model) {
@@ -1579,6 +1662,7 @@ static void parse_arguments (int argc, char *argv[]) {
                 fprintf(stderr,"invalid Raspberry Pi model code %s:\n%s\n", argv[i], error_text.c_str());
                 exit(1);
             }
+            set_rpi_profile_string();
         } else if (arg == "-custom") {
 #define MAX_PROFILE_STRING_LENGTH "64"
             std::string text =
@@ -2578,7 +2662,9 @@ extern "C" void video_reset(void *cls, reset_type_t type) {
     reset_loop = true;
 }
 
-extern "C" int video_set_codec(void *cls, video_codec_t codec) {
+extern "C" int video_set_codec_and_size(void *cls, video_codec_t codec, unsigned short width_source,
+                                        unsigned short height_source, unsigned short x_offset,
+                                        unsigned short y_offset, unsigned short width, unsigned short height) {
     bool video_is_h265 = (codec == VIDEO_CODEC_H265);
     if (mux_to_file) {
         mux_renderer_choose_video_codec(video_is_h265);
@@ -2586,7 +2672,14 @@ extern "C" int video_set_codec(void *cls, video_codec_t codec) {
     if (!use_video) {
         return 0;
     }
-    return video_renderer_choose_codec(false, video_is_h265);
+    video_geometry_t geom;
+    geom.width_source = (int) width_source;
+    geom.height_source = (int) height_source;
+    geom.x_offset = (int) x_offset;
+    geom.y_offset = (int) y_offset;
+    geom.width = (int) width;
+    geom.height = (int) height;
+    return video_renderer_choose_codec_and_size(false, video_is_h265, &geom);
 }
 
 extern "C" void display_pin(void *cls, char *pin) {
@@ -2880,18 +2973,13 @@ extern "C" void audio_get_format (void *cls, unsigned char *ct, unsigned short *
     }
 }
 
-extern "C" void video_report_size(void *cls, float *width_source, float *height_source, float *width, float *height) {
-    if (use_video) {
-        video_renderer_size(width_source, height_source, width, height);
-    }
-}
-
 extern "C" void audio_set_coverart(void *cls, const void *buffer, int buflen) {
     if (buffer && coverart_filename.length()) {
         write_coverart(coverart_filename.c_str(), buffer, buflen);
         LOGI("coverart size %d written to %s", buflen,  coverart_filename.c_str());
     } else if (buffer && render_coverart) {
-        video_renderer_choose_codec(true, false);  /* video_is_jpeg = true */
+        video_geometry_t geom = {0};
+        video_renderer_choose_codec_and_size(true, false, &geom);  /* video_is_jpeg = true */
         video_renderer_display_jpeg(buffer, &buflen);
         coverart_artist = "_pending_";
     }
@@ -2970,9 +3058,13 @@ extern "C" void register_client(void *cls, const char *device_id, const char *cl
     LOGI("registered new client: %s DeviceID = %s PK = \n%s", client_name, device_id, client_pk);
     registered_keys.push_back(client_pk);
     if (strlen(pairing_register.c_str())) {
-        FILE *fp = fopen(pairing_register.c_str(), "a");
+        FILE *fp = fopen600(pairing_register.c_str(), "a");
         if (fp) {
-            fprintf(fp, "%s,%s,%s\n", client_pk, device_id, client_name);
+            time_t raw_time = time(NULL);
+            struct tm *tm_info = localtime(&raw_time);
+            char time_str[20];
+            strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tm_info);
+            fprintf(fp, "%s,%s,%s,%s\n", client_pk, time_str, device_id, client_name);
             fclose(fp);
         }
     }
@@ -2993,7 +3085,11 @@ extern "C" bool check_register(void *cls, const char *client_pk) {
         return false;
     }
 }
-/* control  callbacks for video player (unimplemented) */
+
+extern "C" void get_custom_profile(void *cls, const char **custom_profile) {
+    /* fetches a pointer to  std::string custom_profile_string.c_str()  */
+    *custom_profile = (custom_profile_string.empty() ? NULL : custom_profile_string.c_str());
+}
 
 extern "C" void on_video_play(void *cls, const char* location, const float start_position) {
     /* start_position needs to be implemented */
@@ -3105,7 +3201,6 @@ static int start_raop_server (unsigned short display[5], unsigned short tcp[3], 
     raop_cbs.audio_set_client_volume = audio_set_client_volume;
     raop_cbs.audio_set_volume = audio_set_volume;
     raop_cbs.audio_get_format = audio_get_format;
-    raop_cbs.video_report_size = video_report_size;
     raop_cbs.audio_set_metadata = audio_set_metadata;
     raop_cbs.audio_set_coverart = audio_set_coverart;
     raop_cbs.audio_stop_coverart_rendering = audio_stop_coverart_rendering;
@@ -3117,7 +3212,8 @@ static int start_raop_server (unsigned short display[5], unsigned short tcp[3], 
     raop_cbs.passwd = passwd;
     raop_cbs.export_dacp = export_dacp;
     raop_cbs.video_reset = video_reset;
-    raop_cbs.video_set_codec = video_set_codec;
+    raop_cbs.video_set_codec_and_size = video_set_codec_and_size;
+    raop_cbs.get_custom_profile = get_custom_profile;
 #ifdef DBUS
     raop_cbs.mirror_video_running = mirror_video_running;
 #endif
