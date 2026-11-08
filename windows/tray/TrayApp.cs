@@ -592,7 +592,6 @@ namespace UxPlayTray
                 Open(ReleasesUrl);
         }
 
-        /// <summary>Opens a folder or web page with its default program.</summary>
         async System.Threading.Tasks.Task SaveScreenshot()
         {
             await System.Threading.Tasks.Task.Delay(300);  // let the menu close so it isn't in the picture
@@ -611,13 +610,14 @@ namespace UxPlayTray
                 return;
             }
             if (saved)
-                ShowBalloon(5000, "Screenshot saved", Path.GetFileName(path) + " is in " + AppPaths.ScreenshotsDir +
-                    ". Click to open the folder.", ToolTipIcon.Info, AppPaths.ScreenshotsDir);
+                ShowBalloon(5000, "Screenshot saved", Path.GetFileName(path) + " is in Pictures\\UxPlay. Click to open the folder.",
+                    ToolTipIcon.Info, AppPaths.ScreenshotsDir);
             else
                 ShowBalloon(8000, "UxPlay couldn't save the screenshot",
                     "The mirror window isn't open yet.", ToolTipIcon.Warning);
         }
 
+        /// <summary>Opens a folder or web page with its default program.</summary>
         static void Open(string target)
         {
             try
