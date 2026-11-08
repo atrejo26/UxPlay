@@ -123,6 +123,8 @@ jobs:
           # uxplay's own messages must arrive while it runs (the tray app reads the PIN from them)
           if ($log -notmatch 'Initialized server socket') { throw "uxplay.exe's messages did not arrive while it was running" }
           if ($log -match 'gst_parse_launch|no element|could not set property') { throw "uxplay.exe reported a GStreamer error" }
+          # the address the iPhone is told to connect to (lib/mdnsd picks the PC's main adapter)
+          if ($log -notmatch 'mDNS: advertising on \d+\.\d+\.\d+\.\d+') { throw "uxplay.exe did not find a network address to advertise" }
 
       - name: Upload portable app
         uses: actions/upload-artifact@v4

@@ -57,6 +57,17 @@ so the iPhone can find the PC even when Windows calls your home Wi-Fi
 "Public". On networks you don't trust, such as café Wi-Fi, quit UxPlay or
 turn on **Ask for a PIN** in Settings.
 
+### iPhone doesn't list the PC?
+
+- Both must be on the same Wi-Fi network, not a guest network.
+- **Troubleshooting → Allow through Windows Firewall**.
+- **Troubleshooting → Show log**: the line `mDNS: advertising on …` gives the
+  address the iPhone is told to use. It should be this PC's Wi-Fi or Ethernet
+  address. UxPlay skips Hyper-V/WSL, virtual-machine and VPN adapters and picks
+  the one Windows itself prefers.
+- A VPN can block the local network: turn it off while mirroring, or allow
+  local network access in its settings.
+
 ### No sound?
 
 - Right-click the tray icon → **Troubleshooting → Play a test sound**. If you

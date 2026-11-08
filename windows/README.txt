@@ -44,6 +44,9 @@ iPhone doesn't show this PC?
 ----------------------------
   - Check both are on the same Wi-Fi network (not a guest network).
   - Right-click the UxPlay icon > Troubleshooting > Allow through Windows Firewall.
+  - Using a VPN? Turn it off while mirroring, or allow local network access in it.
+  - Right-click the UxPlay icon > Troubleshooting > Show log: the line
+    "mDNS: advertising on ..." should show this PC's Wi-Fi or Ethernet address.
   - Right-click the UxPlay icon > Restart.
   - Still stuck: quit UxPlay, run uxplay\uxplay-console.bat and read
     the messages it prints.

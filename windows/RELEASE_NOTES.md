@@ -5,6 +5,7 @@ Mirror your iPhone or iPad screen to your Windows PC with AirPlay. No MSYS2, Bon
 ### What's new
 - **Sound output choice (beta).** Settings → **Sound output**: if you see the picture but hear nothing, try *Windows audio (WASAPI)* or *Compatibility mode (DirectSound)*.
 - **Play a test sound** (Troubleshooting menu): a beep through the same sound output as mirroring, so you can tell a PC sound problem from a network one. If it can't be heard, UxPlay tries compatibility mode and switches to it when that works.
+- **Finds the right network on PCs with a VPN or virtual machines.** UxPlay now skips VPN (WireGuard, Tailscale, TAP and so on), Hyper-V/WSL and virtual-machine adapters and self-assigned 169.254 addresses, and picks the network Windows itself prefers. The log shows which address it advertises.
 - **Keep on top of other windows** (tray menu): the mirror window stays above your other windows, handy for following along on the iPhone while you work.
 - **New-version notice.** About a minute after UxPlay starts, it checks once whether a newer release is out and shows a notice you can click to download it. Turn it off in Settings.
 - **About / check for updates** in the tray menu, and **Troubleshooting → Open UxPlay's data folder**.
