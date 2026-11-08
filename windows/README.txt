@@ -7,8 +7,9 @@ Double-click UxPlay.exe. A blue UxPlay icon appears near the clock
 (click the ^ arrow there if you don't see it).
 
 The first time, Windows may ask whether to allow UxPlay on your network.
-Tick "Private networks" (and "Public networks" if your home Wi-Fi is set
-to Public), then click Allow.
+Tick "Private networks" only, then click Allow. On public Wi-Fi (cafés,
+hotels, airports) nobody can then reach UxPlay. If your home Wi-Fi is set
+to Public, UxPlay tells you: set it to Private in Windows' network settings.
 
 Connect your iPhone
 -------------------
@@ -25,9 +26,9 @@ Right-click the UxPlay icon for:
   - Full screen on or off (borderless). You can also press Alt+Enter
     in the mirror window to switch in and out of full screen.
   - Settings: the name shown on the iPhone, quality, sound, a PIN code,
-    and starting UxPlay when you sign in to Windows. With "Ask for a PIN"
-    on, a window shows the 4-digit code to type on the iPhone the first
-    time it connects.
+    and starting UxPlay when you sign in to Windows. "Ask for a PIN" is on
+    from the start: a window shows the 4-digit code to type on the iPhone the first
+    time it connects, so only someone who can see your screen can connect.
   - Troubleshooting: Windows Firewall fix, test sound and the log
   - Keep on top of other windows: the mirror window stays in front
   - Save a screenshot: saves what the mirror window shows as a PNG

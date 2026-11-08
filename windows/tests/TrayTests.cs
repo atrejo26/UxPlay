@@ -33,7 +33,7 @@ public class CommandLineTests
         Assert.Contains("-vs \"d3d11videosink fullscreen-toggle-mode=alt-enter+property\"", args);
         Assert.Contains("-fps 60", args);
         Assert.DoesNotContain("fullscreen=true", args);
-        Assert.DoesNotContain("-pin", args);
+        Assert.Contains("-pin -reg ", args);  // safe by default: a PIN the first time each iPhone connects
         Assert.DoesNotContain("-as", args);
         Assert.DoesNotContain("-s ", args);
     }

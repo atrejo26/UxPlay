@@ -61,7 +61,7 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 [Run]
 ; let the iPhone reach UxPlay through Windows Firewall
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""UxPlay"""; Flags: runhidden; StatusMsg: "Configuring Windows Firewall..."
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""UxPlay"" dir=in action=allow enable=yes profile=any program=""{app}\uxplay\bin\uxplay.exe"""; Flags: runhidden; StatusMsg: "Configuring Windows Firewall..."
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""UxPlay"" dir=in action=allow enable=yes profile=private,domain program=""{app}\uxplay\bin\uxplay.exe"""; Flags: runhidden; StatusMsg: "Configuring Windows Firewall..."
 Filename: "{app}\UxPlay.exe"; Description: "Start UxPlay now"; Flags: postinstall nowait skipifsilent runasoriginaluser
 
 [UninstallRun]

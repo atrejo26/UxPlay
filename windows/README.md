@@ -54,10 +54,19 @@ connected UxPlay sits idle and the PC sleeps as usual.
   soon as it arrives, at the cost of sound that can lag the picture slightly.
 - Close heavy programs (games, video calls, big downloads) while mirroring.
 
-The installer adds a Windows Firewall rule for UxPlay on all network types,
-so the iPhone can find the PC even when Windows calls your home Wi-Fi
-"Public". On networks you don't trust, such as café Wi-Fi, quit UxPlay or
-turn on **Ask for a PIN** in Settings.
+### Safety
+
+- **Private networks only.** The installer's Windows Firewall rule (and
+  **Troubleshooting → Allow through Windows Firewall**) lets iPhones in on
+  networks Windows calls Private or Domain, never on Public ones such as café,
+  hotel or airport Wi-Fi. If your home Wi-Fi is set to Public, UxPlay says so
+  and the notice opens Windows' network settings, where you can set it to Private.
+- **A PIN by default.** The first time each iPhone connects it must type the
+  4-digit code shown on this PC, so a neighbour on the same Wi-Fi can't take
+  over your screen. Paired iPhones are remembered.
+- **No command shell with administrator rights.** "Allow through Windows
+  Firewall" restarts UxPlay.exe as administrator just to run System32's
+  `netsh` with a checked path; no folder name can become a command.
 
 ### iPhone doesn't list the PC?
 
@@ -127,7 +136,8 @@ that picks the concrete classes.
 | `ErrorLog` | tray-error.log: unexpected errors, kept below 1 MB (the older part moves to tray-error.old.log) |
 | `ScreenshotName` | File names for "Save a screenshot": date and time, never overwriting an earlier one |
 | `IKeepAwake` / `KeepAwake` | Keeps the screen on while mirroring |
-| `IFirewall` / `WindowsFirewall` | The Windows Firewall rule |
+| `IFirewall` / `FirewallRule` / `WindowsFirewall` | The Windows Firewall rule: Private and Domain networks only, added by an elevated copy of UxPlay.exe without a shell |
+| `INetworkProfiles` / `NetworkSafety` / `WmiNetworkProfiles` | Notices when every real network is Public, so the user knows why iPhones are kept out |
 | `SettingsForm`, `PinForm` | The Settings and PIN windows |
 | `LogFile` | `uxplay.log`, written from two threads and kept under 5 MB |
 | `JobObject`, `AppPaths`, `AppIcon` | Small helpers |

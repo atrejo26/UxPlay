@@ -20,6 +20,7 @@ namespace UxPlayTray
         public ISoundTest SoundTest;
         public IUpdateCheck UpdateCheck;
         public IPrompt Prompt;
+        public INetworkProfiles NetworkProfiles;
     }
 
     /// <summary>
@@ -39,6 +40,7 @@ namespace UxPlayTray
         readonly ISoundTest soundTest;
         readonly IUpdateCheck updateCheck;
         readonly IPrompt prompt;
+        readonly INetworkProfiles networkProfiles;
         readonly ConnectionMonitor connection = new ConnectionMonitor();
         readonly RestartPolicy restartPolicy = new RestartPolicy();
 
@@ -69,6 +71,7 @@ namespace UxPlayTray
             soundTest = services.SoundTest;
             updateCheck = services.UpdateCheck;
             prompt = services.Prompt;
+            networkProfiles = services.NetworkProfiles;
             settings = store.Load();
 
             ui = new Control();
@@ -174,7 +177,24 @@ namespace UxPlayTray
                 ShowBalloon(8000, "UxPlay is ready",
                     "On your iPhone: open Control Center, tap Screen Mirroring, then choose \"" +
                     settings.DisplayName + "\".", ToolTipIcon.Info);
+            _ = WarnIfPublicNetwork();
             _ = CheckForUpdate();
+        }
+
+        /// <summary>
+        /// On a network Windows calls Public, Windows Firewall keeps iPhones away from
+        /// UxPlay, which is right in a café but puzzling at home: say why, and how to fix it.
+        /// </summary>
+        async System.Threading.Tasks.Task WarnIfPublicNetwork()
+        {
+            if (networkProfiles == null)
+                return;
+            var networks = await System.Threading.Tasks.Task.Run(() => networkProfiles.Connected());
+            if (!NetworkSafety.OnlyPublic(networks))
+                return;
+            ShowBalloon(20000, "Your network is set to Public",
+                "To keep you safe, Windows Firewall stops iPhones reaching UxPlay on public networks. " +
+                "If this is your own Wi-Fi, click here and set it to Private.", ToolTipIcon.Warning, "ms-settings:network-status");
         }
 
         void ShowBalloon(int timeout, string title, string text, ToolTipIcon icon, string link = null)
