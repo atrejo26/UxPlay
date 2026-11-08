@@ -3,56 +3,73 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 
 namespace UxPlayTray
 {
+    /// <summary>Everything the tray app works with, so each part can be swapped or tested on its own.</summary>
+    sealed class TrayServices
+    {
+        public IReceiver Receiver;
+        public ISettingsStore SettingsStore;
+        public IStartupRegistration Startup;
+        public IMirrorWindow MirrorWindow;
+        public IKeepAwake KeepAwake;
+        public IFirewall Firewall;
+    }
+
     /// <summary>
-    /// Lives in the system tray, runs uxplay.exe hidden in the background and
-    /// restarts it whenever settings change.
+    /// The tray icon and its menu. Coordinates the receiver, the settings and the
+    /// windows; the work itself is done by the services it is given.
     /// </summary>
     sealed class TrayApp : ApplicationContext
     {
-        // Layout of the bundle next to UxPlay.exe (see windows/bundle.sh).
-        static readonly string AppDir = AppDomain.CurrentDomain.BaseDirectory;
-        static readonly string ServerDir = Path.Combine(AppDir, "uxplay");
-        static readonly string ServerExe = Path.Combine(ServerDir, "bin", "uxplay.exe");
-        static readonly string LogPath = Path.Combine(Settings.DataDir, "uxplay.log");
+        const string ReleasesUrl = "https://github.com/atrejo26/UxPlay/releases";
 
-
-        /// <summary>The app icon, shared by the tray and every window.</summary>
-        internal static readonly Icon AppIcon = LoadIcon(null);
+        readonly IReceiver receiver;
+        readonly ISettingsStore store;
+        readonly IStartupRegistration startup;
+        readonly IMirrorWindow mirrorWindow;
+        readonly IKeepAwake keepAwake;
+        readonly IFirewall firewall;
+        readonly ConnectionMonitor connection = new ConnectionMonitor();
 
         readonly NotifyIcon tray;
-        readonly Control ui;  // marshals process events onto the UI thread
+        readonly Control ui;  // marshals receiver events onto the UI thread
         readonly ToolStripMenuItem statusItem, startStopItem, restartItem, fullScreenItem;
-        readonly JobObject job = new JobObject();
         readonly EventWaitHandle showEvent;
         readonly RegisteredWaitHandle showWait;
         readonly System.Windows.Forms.Timer pendingRestartTimer;
 
-        Settings settings = Settings.Load();
-        Process server;
-        LogFile log;
-        bool stopping;
-        DateTime startedAt;
+        readonly Settings settings;
         SettingsForm settingsForm;
         PinForm pinForm;
         bool restartPending;  // apply changed settings once nothing is being mirrored
-        bool connected;       // an iPhone is mirroring or playing sound
-        readonly System.Collections.Generic.HashSet<int> openSockets = new System.Collections.Generic.HashSet<int>();
 
-        public TrayApp()
+        public TrayApp(TrayServices services)
         {
+            receiver = services.Receiver;
+            store = services.SettingsStore;
+            startup = services.Startup;
+            mirrorWindow = services.MirrorWindow;
+            keepAwake = services.KeepAwake;
+            firewall = services.Firewall;
+            settings = store.Load();
+
             ui = new Control();
             ui.CreateControl();
 
+            receiver.OutputReceived += line => OnUi(() => connection.OnLine(line));
+            receiver.ExitedUnexpectedly += code => OnUi(() => OnReceiverExited(code));
+            connection.PinRequested += ShowPin;
+            connection.Connected += OnConnected;
+            connection.Disconnected += OnDisconnected;
+
             statusItem = new ToolStripMenuItem("UxPlay") { Enabled = false };
             statusItem.Font = new Font(statusItem.Font, FontStyle.Bold);
-            startStopItem = new ToolStripMenuItem("Stop", null, (s, e) => ToggleServer());
-            restartItem = new ToolStripMenuItem("Restart", null, (s, e) => RestartServer());
+            startStopItem = new ToolStripMenuItem("Stop", null, (s, e) => ToggleReceiver());
+            restartItem = new ToolStripMenuItem("Restart", null, (s, e) => RestartReceiver());
             fullScreenItem = new ToolStripMenuItem("Full screen", null, (s, e) => ToggleFullScreen())
             {
                 Checked = settings.FullScreen,
@@ -76,7 +93,7 @@ namespace UxPlayTray
                 new ToolStripMenuItem("Troubleshooting", null,
                     new ToolStripMenuItem("Allow through Windows Firewall", null, (s, e) => FixFirewall()),
                     new ToolStripMenuItem("Show log", null, (s, e) => ShowLog()),
-                    new ToolStripMenuItem("Open UxPlay's data folder", null, (s, e) => OpenFolder(Settings.DataDir))),
+                    new ToolStripMenuItem("Open UxPlay's data folder", null, (s, e) => Open(AppPaths.DataDir))),
                 new ToolStripMenuItem("About UxPlay / check for updates", null, (s, e) => ShowAbout()),
                 new ToolStripSeparator(),
                 new ToolStripMenuItem("Quit", null, (s, e) => Quit()),
@@ -84,7 +101,7 @@ namespace UxPlayTray
 
             tray = new NotifyIcon
             {
-                Icon = LoadIcon(SystemInformation.SmallIconSize),
+                Icon = AppIcon.Load(SystemInformation.SmallIconSize),
                 Text = "UxPlay",
                 ContextMenuStrip = menu,
                 Visible = true,
@@ -100,26 +117,19 @@ namespace UxPlayTray
             showWait = ThreadPool.RegisterWaitForSingleObject(showEvent,
                 (state, timedOut) => OnUi(ShowHowToConnect), null, Timeout.Infinite, false);
 
-            if (!File.Exists(ServerExe))
+            if (!File.Exists(AppPaths.ServerExe))
             {
                 SetStatus("UxPlay files are missing");
-                MessageBox.Show("Could not find:\n" + ServerExe +
+                MessageBox.Show("Could not find:\n" + AppPaths.ServerExe +
                     "\n\nPlease reinstall UxPlay or unzip the whole download folder.",
                     "UxPlay", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            KillLeftoverServers();
-            if (StartServer())
+            if (StartReceiver())
                 tray.ShowBalloonTip(8000, "UxPlay is ready",
                     "On your iPhone: open Control Center, tap Screen Mirroring, then choose \"" +
-                    Settings.CleanName(settings.Name) + "\".", ToolTipIcon.Info);
-        }
-
-        static Icon LoadIcon(Size? size)
-        {
-            using var stream = typeof(TrayApp).Assembly.GetManifestResourceStream("UxPlayTray.uxplay.ico");
-            return size.HasValue ? new Icon(stream, size.Value) : new Icon(stream);
+                    settings.DisplayName + "\".", ToolTipIcon.Info);
         }
 
         void OnUi(Action action)
@@ -128,140 +138,120 @@ namespace UxPlayTray
                 ui.BeginInvoke(action);
         }
 
-        // ---- uxplay.exe process -------------------------------------------------
+        static string Version => typeof(TrayApp).Assembly.GetName().Version.ToString(3);
 
-        bool StartServer(bool keepLog = false)
+        // ---- receiver -----------------------------------------------------------
+
+        bool StartReceiver(bool keepLog = false)
         {
-            if (server != null)
+            if (receiver.IsRunning)
                 return true;
-
-            var psi = new ProcessStartInfo(ServerExe, settings.BuildArguments())
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8,
-                WorkingDirectory = Settings.DataDir,
-            };
-            ConfigureEnvironment(psi);
-            // uxplay-console.bat starts uxplay with these same options.
+            string args = UxPlayCommandLine.Build(settings, AppPaths.DataDir);
+            SaveArgsForConsole(args);
+            ResetConnection();
             try
             {
-                Directory.CreateDirectory(Settings.DataDir);
-                File.WriteAllText(Path.Combine(Settings.DataDir, "uxplay-args.txt"), psi.Arguments, new UTF8Encoding(false));
+                receiver.Start(args, keepLog);
             }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-
-            try
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is IOException ||
+                                       ex is UnauthorizedAccessException || ex is InvalidOperationException)
             {
-                Directory.CreateDirectory(Settings.DataDir);
-                var processLog = new LogFile(LogPath, "> uxplay.exe " + psi.Arguments, keepLog);
-                log = processLog;
-                var p = new Process { StartInfo = psi, EnableRaisingEvents = true };
-                // Each copy of uxplay.exe writes to its own log, even after a restart.
-                p.OutputDataReceived += (s, e) => OnOutput(processLog, e.Data);
-                p.ErrorDataReceived += (s, e) => OnOutput(processLog, e.Data);
-                p.Exited += (s, e) => OnUi(() => OnServerExited(p));
-                p.Start();
-                job.Add(p);  // uxplay.exe is closed automatically if this app goes away
-                p.BeginOutputReadLine();
-                p.BeginErrorReadLine();
-                server = p;
-                startedAt = DateTime.Now;
-                stopping = false;
-                SetRestartPending(false);
-                SetStatus("Ready - waiting for iPhone");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                CloseLog();
                 SetStatus("Stopped");
                 MessageBox.Show("Could not start UxPlay:\n" + ex.Message, "UxPlay",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return false;
             }
+            SetStatus("Ready - waiting for iPhone");
+            return true;
         }
 
-        /// <summary>Points GStreamer at the plugins bundled with this app, ignoring any other GStreamer install.</summary>
-        static void ConfigureEnvironment(ProcessStartInfo psi)
+        /// <summary>uxplay-console.bat starts uxplay with these same options.</summary>
+        static void SaveArgsForConsole(string args)
         {
-            var env = psi.EnvironmentVariables;
-            string bin = Path.Combine(ServerDir, "bin");
-            env["PATH"] = bin + ";" + env["PATH"];
-            env["GST_PLUGIN_SYSTEM_PATH_1_0"] = Path.Combine(ServerDir, "lib", "gstreamer-1.0");
-            env["GST_PLUGIN_SCANNER_1_0"] = Path.Combine(ServerDir, "libexec", "gstreamer-1.0", "gst-plugin-scanner.exe");
-            env["GST_REGISTRY_1_0"] = Path.Combine(Settings.DataDir, "gst-registry.bin");
-            env.Remove("GST_PLUGIN_PATH");
-            env.Remove("GST_PLUGIN_PATH_1_0");
-            env.Remove("GST_PLUGIN_SYSTEM_PATH");
-            env["FONTCONFIG_PATH"] = Path.Combine(ServerDir, "etc", "fonts");
-            // uxplay looks for ~/.uxplayrc and similar files under HOME
-            env["HOME"] = Settings.DataDir;
+            try
+            {
+                Directory.CreateDirectory(AppPaths.DataDir);
+                File.WriteAllText(AppPaths.ArgsFile, args, new UTF8Encoding(false));
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
         }
 
-        void OnOutput(LogFile processLog, string line)
+        void StopReceiver()
         {
-            if (line == null)
-                return;
-            processLog.WriteLine(line);
+            receiver.Stop();
+            ResetConnection();
+            SetStatus("Stopped");
+        }
 
-            Match m;
-            if ((m = OutputPatterns.PinRequest.Match(line)).Success)
+        void RestartReceiver()
+        {
+            StopReceiver();
+            StartReceiver();
+        }
+
+        void ToggleReceiver()
+        {
+            if (receiver.IsRunning)
+                StopReceiver();
+            else
+                StartReceiver();
+        }
+
+        void OnReceiverExited(int code)
+        {
+            ResetConnection();
+            // Unexpected exit: restart automatically if it had been running a while,
+            // otherwise something is wrong with the setup, so tell the user.
+            if (receiver.Uptime.TotalSeconds > 20)
             {
-                string pin = m.Groups[1].Value;
-                OnUi(() => ShowPin(pin));
-            }
-            else if ((m = OutputPatterns.ConnectRequest.Match(line)).Success)
-            {
-                string device = m.Groups[1].Value.Trim();
-                OnUi(() => OnConnected(device));
-            }
-            else if ((m = OutputPatterns.SocketOpened.Match(line)).Success)
-            {
-                int socket = int.Parse(m.Groups[1].Value);
-                OnUi(() => openSockets.Add(socket));
-            }
-            else if ((m = OutputPatterns.SocketClosed.Match(line)).Success)
-            {
-                int socket = int.Parse(m.Groups[1].Value);
-                OnUi(() =>
+                // Keep the log of the copy that stopped, for troubleshooting.
+                try
                 {
-                    openSockets.Remove(socket);
-                    if (openSockets.Count == 0)
-                        OnDisconnected();
-                });
+                    File.AppendAllText(AppPaths.LogFile,
+                        "--- uxplay.exe stopped unexpectedly (exit code " + code + "); restarting ---\r\n");
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                StartReceiver(keepLog: true);
+                return;
             }
+            SetStatus("Stopped (error)");
+            var answer = MessageBox.Show(
+                "UxPlay stopped unexpectedly (exit code " + code + ").\n\nOpen the log to see what went wrong?",
+                "UxPlay", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+            if (answer == DialogResult.Yes)
+                ShowLog();
         }
 
-        void OnConnected(string device)
+        // ---- connection ---------------------------------------------------------
+
+        void OnConnected(string device, bool isNew)
         {
-            if (server == null)
-                return;
             ClosePin();  // paired: the code is no longer needed
-            bool wasConnected = connected;
-            connected = true;
-            KeepAwake.Set(true);  // don't let the screen turn off while mirroring
+            keepAwake.Set(true);  // don't let the screen turn off while mirroring
             SetStatus("Connected: " + device);
-            if (!wasConnected)
+            if (isNew)
                 tray.ShowBalloonTip(3000, "UxPlay", device + " is connecting...", ToolTipIcon.None);
         }
 
         void OnDisconnected()
         {
-            if (!connected)
-                return;
-            connected = false;
-            KeepAwake.Set(false);
-            if (server != null)
+            keepAwake.Set(false);
+            if (receiver.IsRunning)
                 SetStatus("Ready - waiting for iPhone");
+        }
+
+        /// <summary>Forgets the connection state of a uxplay.exe that has gone.</summary>
+        void ResetConnection()
+        {
+            ClosePin();
+            connection.Reset();
+            keepAwake.Set(false);
+            SetRestartPending(false);
         }
 
         void ShowPin(string pin)
         {
-            if (server == null)
+            if (!receiver.IsRunning)
                 return;
             if (pinForm == null || pinForm.IsDisposed)
                 pinForm = new PinForm();
@@ -275,159 +265,13 @@ namespace UxPlayTray
             pinForm = null;
         }
 
-        void OnServerExited(Process p)
-        {
-            if (p != server)
-                return;
-            server = null;
-            // Exited can arrive before the last lines of output have been read, and those
-            // usually say why it stopped: wait for them before closing the log.
-            try { p.WaitForExit(); } catch (InvalidOperationException) { }
-            int code = SafeExitCode(p);
-            p.Dispose();
-            CloseLog();
-            ResetConnection();
-
-            if (stopping)
-            {
-                SetStatus("Stopped");
-                return;
-            }
-
-            // Unexpected exit: restart automatically if it had been running a while,
-            // otherwise something is wrong with the setup, so tell the user.
-            if ((DateTime.Now - startedAt).TotalSeconds > 20)
-            {
-                // Keep the log of the copy that stopped, for troubleshooting.
-                try
-                {
-                    File.AppendAllText(LogPath, "--- uxplay.exe stopped unexpectedly (exit code " + code + "); restarting ---\r\n");
-                }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                StartServer(keepLog: true);
-                return;
-            }
-            SetStatus("Stopped (error)");
-            var answer = MessageBox.Show(
-                "UxPlay stopped unexpectedly (exit code " + code + ").\n\nOpen the log to see what went wrong?",
-                "UxPlay", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
-            if (answer == DialogResult.Yes)
-                ShowLog();
-        }
-
-        static int SafeExitCode(Process p)
-        {
-            try { return p.ExitCode; } catch (InvalidOperationException) { return -1; }
-        }
-
-        void StopServer()
-        {
-            var p = server;
-            if (p == null)
-                return;
-            stopping = true;
-            try
-            {
-                if (!p.HasExited)
-                {
-                    p.Kill();
-                    p.WaitForExit(3000);
-                }
-            }
-            catch (InvalidOperationException) { }
-            catch (System.ComponentModel.Win32Exception) { }
-            server = null;
-            p.Dispose();
-            CloseLog();
-            ResetConnection();
-            SetStatus("Stopped");
-        }
-
-        /// <summary>Forgets the connection state of a uxplay.exe that has gone.</summary>
-        void ResetConnection()
-        {
-            ClosePin();
-            openSockets.Clear();
-            connected = false;
-            KeepAwake.Set(false);
-            SetRestartPending(false);
-        }
-
-        void RestartServer()
-        {
-            StopServer();
-            StartServer();
-        }
-
-        void ToggleServer()
-        {
-            if (server != null)
-                StopServer();
-            else
-                StartServer();
-        }
-
-        void CloseLog()
-        {
-            var l = log;
-            log = null;
-            l?.Dispose();
-        }
-
-        /// <summary>Ends copies of the bundled uxplay.exe left behind by a crash.</summary>
-        static void KillLeftoverServers()
-        {
-            foreach (var p in Process.GetProcessesByName("uxplay"))
-            {
-                try
-                {
-                    if (string.Equals(p.MainModule.FileName, ServerExe, StringComparison.OrdinalIgnoreCase))
-                    {
-                        p.Kill();
-                        p.WaitForExit(3000);
-                    }
-                }
-                catch (Exception)
-                {
-                    // not ours, or no access
-                }
-                finally
-                {
-                    p.Dispose();
-                }
-            }
-        }
-
-        // ---- menu actions -------------------------------------------------------
-
-        void SetStatus(string text)
-        {
-            statusItem.Text = "UxPlay: " + text;
-            string tip = "UxPlay - " + text;
-            tray.Text = tip.Length > 63 ? tip.Substring(0, 63) : tip;  // NotifyIcon limit
-            startStopItem.Text = server != null ? "Stop" : "Start";
-            restartItem.Enabled = server != null;
-        }
-
-        void ShowHowToConnect()
-        {
-            MessageBox.Show(
-                "To show your iPhone on this PC:\n\n" +
-                "1. Connect your iPhone and this PC to the same Wi-Fi network.\n" +
-                "2. On the iPhone, swipe down from the top-right corner to open Control Center.\n" +
-                "3. Tap Screen Mirroring.\n" +
-                "4. Choose \"" + Settings.CleanName(settings.Name) + "\".\n\n" +
-                "To stop, tap Screen Mirroring again and choose Stop Mirroring.\n\n" +
-                "Your iPhone doesn't list this PC? Right-click the UxPlay icon near the clock and choose " +
-                "Troubleshooting > Allow through Windows Firewall.",
-                "UxPlay", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
+        // ---- full screen --------------------------------------------------------
 
         /// <summary>Full screen state of the open mirror window, or the setting when there is none.</summary>
         bool CurrentFullScreen()
         {
-            if (server != null && !settings.HasOwnVideoSink)
-                return MirrorWindow.IsFullScreen(server.Id) ?? settings.FullScreen;
+            if (receiver.IsRunning && !settings.HasOwnVideoSink)
+                return mirrorWindow.IsFullScreen(receiver.ProcessId) ?? settings.FullScreen;
             return settings.FullScreen;
         }
 
@@ -436,14 +280,14 @@ namespace UxPlayTray
             settings.FullScreen = !CurrentFullScreen();
             fullScreenItem.Checked = settings.FullScreen;
             SaveSettings();
-            if (server == null)
+            if (!receiver.IsRunning)
                 return;
             // While mirroring, switch the open window right away so the connection is
             // kept; uxplay picks up the saved setting once nothing is being mirrored.
-            if (!settings.HasOwnVideoSink && MirrorWindow.SetFullScreen(server.Id, settings.FullScreen))
+            if (!settings.HasOwnVideoSink && mirrorWindow.SetFullScreen(receiver.ProcessId, settings.FullScreen))
                 SetRestartPending(true);
             else
-                RestartServer();
+                RestartReceiver();
         }
 
         void SetRestartPending(bool pending)
@@ -454,15 +298,18 @@ namespace UxPlayTray
 
         void ApplyPendingRestart()
         {
-            if (restartPending && server != null && !connected && !MirrorWindow.Exists(server.Id))
-                RestartServer();
+            if (restartPending && receiver.IsRunning && !connection.IsConnected &&
+                !mirrorWindow.Exists(receiver.ProcessId))
+                RestartReceiver();
         }
+
+        // ---- settings -----------------------------------------------------------
 
         void SaveSettings()
         {
             try
             {
-                settings.Save();
+                store.Save(settings);
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
@@ -478,8 +325,8 @@ namespace UxPlayTray
                 settingsForm.Activate();
                 return;
             }
-            string before = settings.BuildArguments();
-            using (settingsForm = new SettingsForm(settings))
+            string before = UxPlayCommandLine.Build(settings, AppPaths.DataDir);
+            using (settingsForm = new SettingsForm(settings, startup))
             {
                 if (settingsForm.ShowDialog() == DialogResult.OK)
                 {
@@ -487,25 +334,50 @@ namespace UxPlayTray
                     fullScreenItem.Checked = settings.FullScreen;
                     // Restarting disconnects the iPhone, so only do it when something
                     // uxplay uses has changed (or it isn't running).
-                    if (server == null || settings.BuildArguments() != before)
-                        RestartServer();
+                    if (!receiver.IsRunning || UxPlayCommandLine.Build(settings, AppPaths.DataDir) != before)
+                        RestartReceiver();
                 }
             }
             settingsForm = null;
         }
 
+        // ---- other menu items ---------------------------------------------------
+
+        void SetStatus(string text)
+        {
+            statusItem.Text = "UxPlay: " + text;
+            string tip = "UxPlay - " + text;
+            tray.Text = tip.Length > 63 ? tip.Substring(0, 63) : tip;  // NotifyIcon limit
+            startStopItem.Text = receiver.IsRunning ? "Stop" : "Start";
+            restartItem.Enabled = receiver.IsRunning;
+        }
+
+        void ShowHowToConnect()
+        {
+            MessageBox.Show(
+                "To show your iPhone on this PC:\n\n" +
+                "1. Connect your iPhone and this PC to the same Wi-Fi network.\n" +
+                "2. On the iPhone, swipe down from the top-right corner to open Control Center.\n" +
+                "3. Tap Screen Mirroring.\n" +
+                "4. Choose \"" + settings.DisplayName + "\".\n\n" +
+                "To stop, tap Screen Mirroring again and choose Stop Mirroring.\n\n" +
+                "Your iPhone doesn't list this PC? Right-click the UxPlay icon near the clock and choose " +
+                "Troubleshooting > Allow through Windows Firewall.",
+                "UxPlay", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
         void ShowLog()
         {
-            if (!File.Exists(LogPath))
+            if (!File.Exists(AppPaths.LogFile))
             {
                 MessageBox.Show("There is no log yet.", "UxPlay");
                 return;
             }
-            // Copy it so Notepad can open it while uxplay keeps writing.
             try
             {
+                // Copy it so Notepad can open it while uxplay keeps writing.
                 string copy = Path.Combine(Path.GetTempPath(), "uxplay-log.txt");
-                using (var src = new FileStream(LogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                using (var src = new FileStream(AppPaths.LogFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
                 using (var dst = File.Create(copy))
                     src.CopyTo(dst);
                 Process.Start("notepad.exe", "\"" + copy + "\"")?.Dispose();
@@ -513,15 +385,21 @@ namespace UxPlayTray
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException ||
                                        ex is System.ComponentModel.Win32Exception)
             {
-                MessageBox.Show("Could not open the log:\n" + ex.Message + "\n\nIt is saved in:\n" + LogPath,
+                MessageBox.Show("Could not open the log:\n" + ex.Message + "\n\nIt is saved in:\n" + AppPaths.LogFile,
                     "UxPlay", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
-        const string ReleasesUrl = "https://github.com/atrejo26/UxPlay/releases";
-
-        static string Version =>
-            typeof(TrayApp).Assembly.GetName().Version.ToString(3);
+        void FixFirewall()
+        {
+            int? result = firewall.Allow(AppPaths.ServerExe);
+            if (result == 0)
+                MessageBox.Show("UxPlay is now allowed through Windows Firewall.", "UxPlay",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            else if (result != null)
+                MessageBox.Show("Windows Firewall could not be updated (error " + result + ").", "UxPlay",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
 
         void ShowAbout()
         {
@@ -531,15 +409,15 @@ namespace UxPlayTray
                 "Open the download page to check for a newer version?",
                 "About UxPlay", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
             if (answer == DialogResult.Yes)
-                OpenFolder(ReleasesUrl);
+                Open(ReleasesUrl);
         }
 
         /// <summary>Opens a folder or web page with its default program.</summary>
-        static void OpenFolder(string target)
+        static void Open(string target)
         {
             try
             {
-                Directory.CreateDirectory(Settings.DataDir);
+                Directory.CreateDirectory(AppPaths.DataDir);
                 Process.Start(new ProcessStartInfo(target) { UseShellExecute = true })?.Dispose();
             }
             catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is IOException)
@@ -548,40 +426,9 @@ namespace UxPlayTray
             }
         }
 
-        static void FixFirewall()
-        {
-            // Needs administrator rights, so Windows will ask for permission.
-            string rule = "advfirewall firewall {0} rule name=\"UxPlay\"";
-            string cmd =
-                "netsh " + string.Format(rule, "delete") + " >nul 2>&1 & " +
-                "netsh " + string.Format(rule, "add") + " dir=in action=allow enable=yes profile=any " +
-                "program=\"" + ServerExe + "\"";
-            var psi = new ProcessStartInfo("cmd.exe", "/c " + cmd)
-            {
-                UseShellExecute = true,
-                Verb = "runas",
-                WindowStyle = ProcessWindowStyle.Hidden,
-            };
-            try
-            {
-                using var p = Process.Start(psi);
-                p.WaitForExit();
-                if (p.ExitCode == 0)
-                    MessageBox.Show("UxPlay is now allowed through Windows Firewall.", "UxPlay",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
-                else
-                    MessageBox.Show("Windows Firewall could not be updated (error " + p.ExitCode + ").", "UxPlay",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-            catch (System.ComponentModel.Win32Exception)
-            {
-                // the user said No to the permission prompt
-            }
-        }
-
         void Quit()
         {
-            StopServer();
+            StopReceiver();
             ExitThread();
         }
 
@@ -589,8 +436,9 @@ namespace UxPlayTray
         {
             if (disposing)
             {
-                StopServer();
+                receiver.Dispose();
                 ClosePin();
+                keepAwake.Set(false);
                 pendingRestartTimer.Dispose();
                 showWait.Unregister(null);
                 showEvent.Dispose();
@@ -598,7 +446,6 @@ namespace UxPlayTray
                 tray.Icon?.Dispose();
                 tray.Dispose();
                 ui.Dispose();
-                job.Dispose();
             }
             base.Dispose(disposing);
         }

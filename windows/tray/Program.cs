@@ -33,8 +33,20 @@ namespace UxPlayTray
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             Application.ThreadException += (s, e) => ReportError(e.Exception);
             AppDomain.CurrentDomain.UnhandledException += (s, e) => ReportError(e.ExceptionObject as Exception);
+            // The one place that picks the concrete parts the tray app works with.
+            var receiver = new ReceiverProcess(AppPaths.ServerExe, AppPaths.ServerDir, AppPaths.DataDir, AppPaths.LogFile);
+            receiver.KillLeftovers();
+            var services = new TrayServices
+            {
+                Receiver = receiver,
+                SettingsStore = new IniSettingsStore(AppPaths.SettingsFile),
+                Startup = new RunKeyStartup(Application.ExecutablePath),
+                MirrorWindow = new MirrorWindow(),
+                KeepAwake = new KeepAwake(),
+                Firewall = new WindowsFirewall(),
+            };
             // Disposing the app removes the tray icon and stops uxplay.exe on Quit.
-            using (var app = new TrayApp())
+            using (var app = new TrayApp(services))
                 Application.Run(app);
             GC.KeepAlive(mutex);
         }
@@ -44,13 +56,13 @@ namespace UxPlayTray
         {
             try
             {
-                Directory.CreateDirectory(Settings.DataDir);
-                File.AppendAllText(Path.Combine(Settings.DataDir, "tray-error.log"),
+                Directory.CreateDirectory(AppPaths.DataDir);
+                File.AppendAllText(AppPaths.ErrorLog,
                     DateTime.Now + "  " + ex + Environment.NewLine + Environment.NewLine);
             }
             catch (Exception) { }
             MessageBox.Show("Something went wrong in UxPlay:\n" + ex?.Message +
-                "\n\nDetails were saved in " + Path.Combine(Settings.DataDir, "tray-error.log"),
+                "\n\nDetails were saved in " + AppPaths.ErrorLog,
                 "UxPlay", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }

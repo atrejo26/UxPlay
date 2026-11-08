@@ -5,14 +5,26 @@ using System.Threading;
 
 namespace UxPlayTray
 {
+    /// <summary>The receiver's video window, found by the receiver's process id.</summary>
+    interface IMirrorWindow
+    {
+        bool Exists(int processId);
+
+        /// <summary>Whether the window is in full screen; null when no window is open.</summary>
+        bool? IsFullScreen(int processId);
+
+        /// <summary>Switches the open window in or out of full screen; false when there is none.</summary>
+        bool SetFullScreen(int processId, bool fullScreen);
+    }
+
     /// <summary>
     /// The video window uxplay.exe opens while mirroring. Its Direct3D output switches
     /// between a window and borderless full screen on Alt+Enter, so this finds the
     /// window and sends it that key press when its state needs to change.
     /// </summary>
-    static class MirrorWindow
+    sealed class MirrorWindow : IMirrorWindow
     {
-        public static List<IntPtr> Find(int processId)
+        static List<IntPtr> Find(int processId)
         {
             var found = new List<IntPtr>();
             EnumWindows((hwnd, _) =>
@@ -25,10 +37,10 @@ namespace UxPlayTray
             return found;
         }
 
-        public static bool Exists(int processId) => Find(processId).Count > 0;
+        public bool Exists(int processId) => Find(processId).Count > 0;
 
         /// <summary>Whether the mirror window is in full screen; null when no window is open.</summary>
-        public static bool? IsFullScreen(int processId)
+        public bool? IsFullScreen(int processId)
         {
             var windows = Find(processId);
             return windows.Count > 0 ? IsFullScreen(windows[0]) : (bool?)null;
@@ -38,7 +50,7 @@ namespace UxPlayTray
         /// Puts every mirror window of the process into (or out of) full screen.
         /// Returns false when there is no window to change.
         /// </summary>
-        public static bool SetFullScreen(int processId, bool fullScreen)
+        public bool SetFullScreen(int processId, bool fullScreen)
         {
             var windows = Find(processId);
             foreach (var hwnd in windows)

@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- Unit tests for the parts of the tray app that don't need Windows: the uxplay
-       command line built from the settings, and the uxplay messages it reacts to.
+       command line built from the settings, saving and loading the settings, and
+       following uxplay's messages (PIN, connect, disconnect).
        Runs anywhere with:  dotnet test windows/tests -->
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -13,6 +14,9 @@
   <ItemGroup>
     <Compile Include="../tray/Settings.cs" Link="Settings.cs" />
     <Compile Include="../tray/OutputPatterns.cs" Link="OutputPatterns.cs" />
+    <Compile Include="../tray/UxPlayCommandLine.cs" Link="UxPlayCommandLine.cs" />
+    <Compile Include="../tray/SettingsStore.cs" Link="SettingsStore.cs" />
+    <Compile Include="../tray/ConnectionMonitor.cs" Link="ConnectionMonitor.cs" />
   </ItemGroup>
 
   <ItemGroup>

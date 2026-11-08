@@ -8,6 +8,7 @@ namespace UxPlayTray
     sealed class SettingsForm : Form
     {
         readonly Settings settings;
+        readonly IStartupRegistration startup;
         readonly TextBox nameBox = new TextBox { Width = 260 };
         readonly ComboBox resolutionBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
         readonly ComboBox frameRateBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
@@ -18,9 +19,10 @@ namespace UxPlayTray
         readonly CheckBox startupBox = new CheckBox { Text = "Start UxPlay when I sign in to Windows", AutoSize = true };
         readonly TextBox extraBox = new TextBox { Width = 260 };
 
-        public SettingsForm(Settings settings)
+        public SettingsForm(Settings settings, IStartupRegistration startup)
         {
             this.settings = settings;
+            this.startup = startup;
 
             Text = "UxPlay Settings";
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -33,7 +35,7 @@ namespace UxPlayTray
             AutoScaleMode = AutoScaleMode.Dpi;
             Font = SystemFonts.MessageBoxFont;
             Padding = new Padding(12);
-            Icon = TrayApp.AppIcon;
+            Icon = AppIcon.Default;
 
             foreach (var r in Settings.Resolutions)
                 resolutionBox.Items.Add(r.Label);
@@ -54,7 +56,7 @@ namespace UxPlayTray
             audioOutputBox.Enabled = audioBox.Checked;
             audioBox.CheckedChanged += (s, e) => audioOutputBox.Enabled = audioBox.Checked;
             pinBox.Checked = settings.RequirePin;
-            startupBox.Checked = Settings.StartWithWindows;
+            startupBox.Checked = startup.Enabled;
             extraBox.Text = settings.ExtraArgs;
 
             var grid = new TableLayoutPanel
@@ -123,7 +125,7 @@ namespace UxPlayTray
             settings.ExtraArgs = extraBox.Text.Trim();
             try
             {
-                Settings.StartWithWindows = startupBox.Checked;
+                startup.Enabled = startupBox.Checked;
             }
             catch (Exception ex) when (ex is UnauthorizedAccessException || ex is System.Security.SecurityException)
             {

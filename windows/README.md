@@ -82,6 +82,32 @@ turn on **Ask for a PIN** in Settings.
 | `tests/` | Unit tests for the tray app's settings and log parsing: `dotnet test windows/tests`. |
 | `tools/make_icon.py` | Draws `tray/uxplay.ico` (needs Pillow). |
 
+### How the tray app is organised
+
+The tray app follows the SOLID principles. Each class has one job, and
+`TrayApp` works only through small interfaces. `Program.Main` is the one place
+that picks the concrete classes.
+
+| Class | Its one job |
+| --- | --- |
+| `TrayApp` | Tray icon and menu; coordinates the parts below |
+| `IReceiver` / `ReceiverProcess` | Starts and stops `uxplay.exe` with the bundled GStreamer; its log; job object |
+| `ConnectionMonitor` | Reads uxplay's messages: PIN asked, iPhone connected, iPhone gone |
+| `OutputPatterns` | The uxplay messages it recognises |
+| `Settings` | What the user chose (plain data) |
+| `ISettingsStore` / `IniSettingsStore` | Loads and saves `settings.ini` |
+| `UxPlayCommandLine` | Turns `Settings` into uxplay options |
+| `IStartupRegistration` / `RunKeyStartup` | "Start UxPlay when I sign in" |
+| `IMirrorWindow` / `MirrorWindow` | Finds the video window and switches full screen |
+| `IKeepAwake` / `KeepAwake` | Keeps the screen on while mirroring |
+| `IFirewall` / `WindowsFirewall` | The Windows Firewall rule |
+| `SettingsForm`, `PinForm` | The Settings and PIN windows |
+| `LogFile`, `JobObject`, `AppPaths`, `AppIcon` | Small helpers |
+
+New features go in new classes, or new entries in the option tables in
+`Settings`, without changing the others. The Windows-free parts are covered by
+`windows/tests`.
+
 Files the app keeps on the PC are in `%LOCALAPPDATA%\UxPlay`: `settings.ini`,
 `uxplay.log`, the receiver's key `uxplay.pem` (so the iPhone recognises the PC
 after a restart) and GStreamer's plugin cache.
