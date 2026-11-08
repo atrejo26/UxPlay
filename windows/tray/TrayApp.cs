@@ -553,7 +553,7 @@ namespace UxPlayTray
             try
             {
                 // Copy it so Notepad can open it while uxplay keeps writing.
-                string copy = Path.Combine(Path.GetTempPath(), "uxplay-log.txt");
+                string copy = Path.Combine(AppPaths.DataDir, "uxplay-log-copy.txt");  // our own folder, not the shared temp one
                 using (var src = new FileStream(AppPaths.LogFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
                 using (var dst = File.Create(copy))
                     src.CopyTo(dst);

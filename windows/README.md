@@ -67,6 +67,10 @@ connected UxPlay sits idle and the PC sleeps as usual.
 - **No command shell with administrator rights.** "Allow through Windows
   Firewall" restarts UxPlay.exe as administrator just to run System32's
   `netsh` with a checked path; no folder name can become a command.
+- **A hardened build.** uxplay.exe is compiled with stack protection,
+  `_FORTIFY_SOURCE`, ASLR and DEP (CI fails if any is missing), and for any
+  x86-64 CPU. The workflow is read-only except for publishing, its actions are
+  pinned to exact commits, and each release has a `SHA256SUMS.txt`.
 
 ### iPhone doesn't list the PC?
 
