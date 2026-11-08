@@ -7,7 +7,11 @@ namespace UxPlayTray
     static class UxPlayCommandLine
     {
         /// <param name="dataDir">Folder for the receiver's key and PIN register.</param>
-        public static string Build(Settings s, string dataDir)
+        /// <param name="recordingName">
+        /// Path and start of the recordings' file names when <see cref="Settings.Record"/> is on;
+        /// uxplay adds ".1.H264.AAC.mp4", ".2...." for each mirroring session.
+        /// </param>
+        public static string Build(Settings s, string dataDir, string recordingName = null)
         {
             var args = new List<string>();
             // Show exactly this name on the iPhone (no "@hostname" suffix).
@@ -43,6 +47,8 @@ namespace UxPlayTray
             // A random code each time; -reg remembers paired iPhones so it is asked only once.
             if (s.RequirePin)
                 args.Add("-pin -reg " + Quote(Path.Combine(dataDir, "uxplay.register")));
+            if (s.Record && recordingName != null && !s.HasOption("-mp4"))
+                args.Add("-mp4 " + Quote(recordingName));
             if (s.ExtraArgs.Length > 0)
                 args.Add(s.ExtraArgs);
             return string.Join(" ", args);

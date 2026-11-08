@@ -16,6 +16,7 @@ namespace UxPlayTray
         readonly CheckBox audioBox = new CheckBox { Text = "Play iPhone sound on this PC", AutoSize = true };
         readonly ComboBox audioOutputBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
         readonly CheckBox pinBox = new CheckBox { Text = "Ask for a PIN the first time a new device connects", AutoSize = true };
+        readonly CheckBox recordBox = new CheckBox { Text = "Save a video of each mirroring session in Videos\\UxPlay", AutoSize = true };
         readonly CheckBox startupBox = new CheckBox { Text = "Start UxPlay when I sign in to Windows", AutoSize = true };
         readonly CheckBox updatesBox = new CheckBox { Text = "Tell me when a new version of UxPlay is out", AutoSize = true };
         readonly TextBox extraBox = new TextBox { Width = 260 };
@@ -59,6 +60,7 @@ namespace UxPlayTray
             pinBox.Checked = settings.RequirePin;
             startupBox.Checked = startup.Enabled;
             updatesBox.Checked = settings.CheckForUpdates;
+            recordBox.Checked = settings.Record;
             extraBox.Text = settings.ExtraArgs;
 
             var grid = new TableLayoutPanel
@@ -75,6 +77,14 @@ namespace UxPlayTray
             AddRow(grid, null, audioBox);
             AddRow(grid, "Sound output:", audioOutputBox);
             AddRow(grid, null, pinBox);
+            AddRow(grid, null, recordBox);
+            AddRow(grid, null, new Label
+            {
+                Text = "Recordings can take a few GB for each hour of mirroring.",
+                AutoSize = true,
+                ForeColor = SystemColors.GrayText,
+                Margin = new Padding(3, 0, 3, 8),
+            });
             AddRow(grid, null, startupBox);
             AddRow(grid, null, updatesBox);
             AddRow(grid, "Advanced options:", extraBox);
@@ -127,6 +137,7 @@ namespace UxPlayTray
             settings.RequirePin = pinBox.Checked;
             settings.ExtraArgs = extraBox.Text.Trim();
             settings.CheckForUpdates = updatesBox.Checked;
+            settings.Record = recordBox.Checked;
             try
             {
                 startup.Enabled = startupBox.Checked;

@@ -18,5 +18,9 @@ namespace UxPlayTray
         public static readonly string LogFile = Path.Combine(DataDir, "uxplay.log");
         public static readonly string ArgsFile = Path.Combine(DataDir, "uxplay-args.txt");
         public static readonly string ErrorLog = Path.Combine(DataDir, "tray-error.log");
+
+        /// <summary>Videos\UxPlay: recordings of mirroring sessions, when turned on in Settings.</summary>
+        public static readonly string RecordingsDir =
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "UxPlay");
     }
 }

@@ -41,7 +41,7 @@ namespace UxPlayTray
 
         readonly NotifyIcon tray;
         readonly Control ui;  // marshals receiver events onto the UI thread
-        readonly ToolStripMenuItem statusItem, startStopItem, restartItem, fullScreenItem, onTopItem, soundTestItem;
+        readonly ToolStripMenuItem statusItem, startStopItem, restartItem, fullScreenItem, onTopItem, soundTestItem, recordingsItem;
         readonly EventWaitHandle showEvent;
         readonly RegisteredWaitHandle showWait;
         readonly System.Windows.Forms.Timer pendingRestartTimer;
@@ -89,6 +89,10 @@ namespace UxPlayTray
             {
                 Checked = settings.KeepOnTop,
             };
+            recordingsItem = new ToolStripMenuItem("Open my recordings", null, (s, e) => Open(AppPaths.RecordingsDir))
+            {
+                Visible = settings.Record,
+            };
             soundTestItem = new ToolStripMenuItem("Play a test sound", null, async (s, e) => await TestSound());
 
             var menu = new ContextMenuStrip();
@@ -105,6 +109,7 @@ namespace UxPlayTray
                 fullScreenItem,
                 onTopItem,
                 new ToolStripMenuItem("Settings...", null, (s, e) => ShowSettings()),
+                recordingsItem,
                 new ToolStripSeparator(),
                 new ToolStripMenuItem("Troubleshooting", null,
                     new ToolStripMenuItem("Allow through Windows Firewall", null, (s, e) => FixFirewall()),
@@ -199,8 +204,9 @@ namespace UxPlayTray
         {
             if (receiver.IsRunning)
                 return true;
-            string args = UxPlayCommandLine.Build(settings, AppPaths.DataDir);
-            SaveArgsForConsole(args);
+            // the troubleshooting console gets the same options, without the recording
+            SaveArgsForConsole(UxPlayCommandLine.Build(settings, AppPaths.DataDir));
+            string args = UxPlayCommandLine.Build(settings, AppPaths.DataDir, NewRecordingName());
             ResetConnection();
             try
             {
@@ -217,6 +223,30 @@ namespace UxPlayTray
             SetStatus("Ready - waiting for iPhone");
             return true;
         }
+
+        /// <summary>
+        /// Where this run of uxplay saves its recordings, when they are on: a name with the
+        /// start time, so a restart never overwrites the videos of an earlier run.
+        /// </summary>
+        string NewRecordingName()
+        {
+            if (!settings.Record)
+                return null;
+            try
+            {
+                Directory.CreateDirectory(AppPaths.RecordingsDir);  // uxplay won't start without it
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                ShowBalloon(8000, "UxPlay can't record", "The folder " + AppPaths.RecordingsDir +
+                    " can't be created: " + ex.Message, ToolTipIcon.Warning);
+                return null;
+            }
+            return Path.Combine(AppPaths.RecordingsDir, "UxPlay " + DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss"));
+        }
+
+        /// <summary>uxplay's options, minus the recording's file name, which changes on every start.</summary>
+        string OptionsForComparison() => UxPlayCommandLine.Build(settings, AppPaths.DataDir, "recording");
 
         /// <summary>uxplay-console.bat starts uxplay with these same options.</summary>
         static void SaveArgsForConsole(string args)
@@ -407,7 +437,7 @@ namespace UxPlayTray
                 settingsForm.Activate();
                 return;
             }
-            string before = UxPlayCommandLine.Build(settings, AppPaths.DataDir);
+            string before = OptionsForComparison();
             using (settingsForm = new SettingsForm(settings, startup))
             {
                 if (settingsForm.ShowDialog() == DialogResult.OK)
@@ -416,8 +446,9 @@ namespace UxPlayTray
                     fullScreenItem.Checked = settings.FullScreen;
                     // Restarting disconnects the iPhone, so only do it when something
                     // uxplay uses has changed (or it isn't running).
-                    if (!receiver.IsRunning || UxPlayCommandLine.Build(settings, AppPaths.DataDir) != before)
+                    if (!receiver.IsRunning || OptionsForComparison() != before)
                         RestartReceiver();
+                    recordingsItem.Visible = settings.Record;
                 }
             }
             settingsForm = null;
@@ -572,10 +603,12 @@ namespace UxPlayTray
         {
             try
             {
-                Directory.CreateDirectory(AppPaths.DataDir);
+                if (Path.IsPathRooted(target))
+                    Directory.CreateDirectory(target);  // a folder of ours that may not exist yet
                 Process.Start(new ProcessStartInfo(target) { UseShellExecute = true })?.Dispose();
             }
-            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is IOException)
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is IOException ||
+                                       ex is UnauthorizedAccessException)
             {
                 MessageBox.Show("Could not open " + target + ":\n" + ex.Message, "UxPlay");
             }

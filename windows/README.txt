@@ -30,6 +30,7 @@ Right-click the UxPlay icon for:
     time it connects.
   - Troubleshooting: Windows Firewall fix, test sound and the log
   - Keep on top of other windows: the mirror window stays in front
+  - Settings > Save a video of each mirroring session: MP4 files in Videos\UxPlay
   - A notice when a new version is out (can be turned off in Settings)
 
 Smoother mirroring

@@ -20,6 +20,12 @@ on:
         required: false
         default: ''
 
+# A newer push to the same branch or pull request makes the older build pointless.
+# Releases (tags and "Run workflow") are never cancelled.
+concurrency:
+  group: windows-app-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')) }}
+
 jobs:
   windows-app:
     runs-on: windows-latest
@@ -111,7 +117,10 @@ jobs:
 
           # Start the receiver for a few seconds and make sure it comes up cleanly.
           # Same video output and PIN options the tray app passes, so a rejected option fails here.
-          $uxArgs = '-n CI -nh -fps 60 -vs "d3d11videosink fullscreen-toggle-mode=alt-enter+property fullscreen=true" -pin -reg "' + "$env:RUNNER_TEMP\uxplay.register" + '"'
+          # The recording goes to a folder with a space, as Videos\UxPlay\UxPlay <date> <time> does.
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP\rec dir" | Out-Null
+          $uxArgs = '-n CI -nh -fps 60 -vs "d3d11videosink fullscreen-toggle-mode=alt-enter+property fullscreen=true" -pin -reg "' + "$env:RUNNER_TEMP\uxplay.register" + '"' +
+                    ' -mp4 "' + "$env:RUNNER_TEMP\rec dir\UxPlay 2026-01-01 00-00-00" + '"'
           $p = Start-Process "$ux\bin\uxplay.exe" -ArgumentList $uxArgs -PassThru -NoNewWindow `
                  -RedirectStandardOutput "$env:RUNNER_TEMP\out.txt" -RedirectStandardError "$env:RUNNER_TEMP\err.txt"
           Start-Sleep -Seconds 15

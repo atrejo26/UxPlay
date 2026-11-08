@@ -338,3 +338,32 @@ public class ReleaseTagTests
         Assert.Equal(before, UxPlayCommandLine.Build(s, @"C:\data"));
     }
 }
+
+public class RecordingTests
+{
+    [Fact]
+    public void RecordingIsAddedOnlyWhenOnAndNamed()
+    {
+        var s = new Settings();
+        Assert.DoesNotContain("-mp4", UxPlayCommandLine.Build(s, @"C:\data", @"C:\Videos\UxPlay\UxPlay 1"));
+        s.Record = true;
+        Assert.DoesNotContain("-mp4", UxPlayCommandLine.Build(s, @"C:\data"));  // e.g. the console's options
+        Assert.Contains("-mp4 \"C:\\Videos\\UxPlay\\UxPlay 1\"", UxPlayCommandLine.Build(s, @"C:\data", @"C:\Videos\UxPlay\UxPlay 1"));
+    }
+
+    [Fact]
+    public void OwnMp4OptionWins()
+    {
+        var s = new Settings { Record = true, ExtraArgs = "-mp4 D:\\mine" };
+        string args = UxPlayCommandLine.Build(s, @"C:\data", @"C:\Videos\x");
+        Assert.DoesNotContain("C:\\Videos\\x", args);
+        Assert.EndsWith("-mp4 D:\\mine", args);
+    }
+
+    [Fact]
+    public void RecordSettingIsSaved()
+    {
+        Assert.False(IniSettingsStore.Parse(new string[0]).Record);
+        Assert.True(IniSettingsStore.Parse(IniSettingsStore.Format(new Settings { Record = true })).Record);
+    }
+}
