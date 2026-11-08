@@ -40,6 +40,7 @@ namespace UxPlayTray
         readonly ConnectionMonitor connection = new ConnectionMonitor();
 
         readonly NotifyIcon tray;
+        readonly Icon readyIcon, connectedIcon, stoppedIcon;
         readonly Control ui;  // marshals receiver events onto the UI thread
         readonly ToolStripMenuItem statusItem, startStopItem, restartItem, fullScreenItem, onTopItem, soundTestItem, recordingsItem;
         readonly EventWaitHandle showEvent;
@@ -121,9 +122,12 @@ namespace UxPlayTray
                 new ToolStripMenuItem("Quit", null, (s, e) => Quit()),
             });
 
+            readyIcon = AppIcon.Load(SystemInformation.SmallIconSize);
+            connectedIcon = AppIcon.WithDot(readyIcon, Color.FromArgb(0x10, 0xB0, 0x40));
+            stoppedIcon = AppIcon.WithDot(readyIcon, Color.FromArgb(0x90, 0x90, 0x90));
             tray = new NotifyIcon
             {
-                Icon = AppIcon.Load(SystemInformation.SmallIconSize),
+                Icon = readyIcon,
                 Text = "UxPlay",
                 ContextMenuStrip = menu,
                 Visible = true,
@@ -462,6 +466,9 @@ namespace UxPlayTray
             string tip = "UxPlay - " + text;
             tray.Text = tip.Length > 63 ? tip.Substring(0, 63) : tip;  // NotifyIcon limit
             startStopItem.Text = receiver.IsRunning ? "Stop" : "Start";
+            var icon = !receiver.IsRunning ? stoppedIcon : connection.IsConnected ? connectedIcon : readyIcon;
+            if (tray.Icon != icon)
+                tray.Icon = icon;
             restartItem.Enabled = receiver.IsRunning;
         }
 
@@ -632,8 +639,10 @@ namespace UxPlayTray
                 showWait.Unregister(null);
                 showEvent.Dispose();
                 tray.Visible = false;
-                tray.Icon?.Dispose();
                 tray.Dispose();
+                readyIcon.Dispose();
+                connectedIcon.Dispose();
+                stoppedIcon.Dispose();
                 ui.Dispose();
             }
             base.Dispose(disposing);
