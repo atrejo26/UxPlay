@@ -146,6 +146,13 @@ namespace UxPlayTray
                 WorkingDirectory = Settings.DataDir,
             };
             ConfigureEnvironment(psi);
+            // uxplay-console.bat starts uxplay with these same options.
+            try
+            {
+                Directory.CreateDirectory(Settings.DataDir);
+                File.WriteAllText(Path.Combine(Settings.DataDir, "uxplay-args.txt"), psi.Arguments, new UTF8Encoding(false));
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
 
             try
             {
