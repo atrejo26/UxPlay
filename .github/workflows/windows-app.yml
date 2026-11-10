@@ -86,6 +86,13 @@ jobs:
             grep -q -- "$f" build/build.ninja || { echo "uxplay.exe was not compiled with $f"; exit 1; }
           done
 
+      - name: Test how iPhones find the PC (mDNS, Mobile hotspot)
+        # lib/mdnsd built into a test program with the same hardening, then run on this runner
+        run: |
+          gcc -std=gnu11 -Wall -Wextra -Werror -O2 -fstack-protector-strong -D_FORTIFY_SOURCE=2 \
+            -I lib windows/tests/mdnsd_test.c -o build/mdnsd_test.exe -lws2_32 -liphlpapi -lpthread
+          build/mdnsd_test.exe
+
       - name: Bundle uxplay.exe with its DLLs and plugins
         run: windows/bundle.sh build windows/out/UxPlay
 

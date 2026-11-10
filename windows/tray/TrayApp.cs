@@ -520,7 +520,10 @@ namespace UxPlayTray
                 "4. Choose \"" + settings.DisplayName + "\".\n\n" +
                 "To stop, tap Screen Mirroring again and choose Stop Mirroring.\n\n" +
                 "Your iPhone doesn't list this PC? Right-click the UxPlay icon near the clock and choose " +
-                "Troubleshooting > Allow through Windows Firewall.",
+                "Troubleshooting > Allow through Windows Firewall.\n\n" +
+                "On a campus, school or work network, phones often can't find PCs. Turn on this PC's " +
+                "Mobile hotspot instead (Windows Settings > Network & internet > Mobile hotspot) and " +
+                "join it from the iPhone's Wi-Fi settings.",
                 "UxPlay", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 

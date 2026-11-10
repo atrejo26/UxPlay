@@ -62,11 +62,16 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 ; let the iPhone reach UxPlay through Windows Firewall
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""UxPlay"""; Flags: runhidden; StatusMsg: "Configuring Windows Firewall..."
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""UxPlay"" dir=in action=allow enable=yes profile=private,domain program=""{app}\uxplay\bin\uxplay.exe"""; Flags: runhidden; StatusMsg: "Configuring Windows Firewall..."
+; and from iPhones on this PC's own Mobile hotspot only (Windows calls it Public): see windows/tray/Firewall.cs
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""UxPlay (Mobile hotspot)"""; Flags: runhidden; StatusMsg: "Configuring Windows Firewall..."
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""UxPlay (Mobile hotspot)"" dir=in action=allow enable=yes profile=public remoteip=192.168.137.0/24 localip=192.168.137.1 program=""{app}\uxplay\bin\uxplay.exe"""; Flags: runhidden; StatusMsg: "Configuring Windows Firewall..."
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""UxPlay (Mobile hotspot)"" dir=in action=allow enable=yes profile=public remoteip=192.168.137.0/24 protocol=udp localport=5353 program=""{app}\uxplay\bin\uxplay.exe"""; Flags: runhidden; StatusMsg: "Configuring Windows Firewall..."
 Filename: "{app}\UxPlay.exe"; Description: "Start UxPlay now"; Flags: postinstall nowait skipifsilent runasoriginaluser
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM UxPlay.exe"; Flags: runhidden; RunOnceId: "StopTray"
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""UxPlay"""; Flags: runhidden; RunOnceId: "RemoveFirewallRule"
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""UxPlay (Mobile hotspot)"""; Flags: runhidden; RunOnceId: "RemoveHotspotFirewallRule"
 
 [UninstallDelete]
 ; GStreamer's plugin cache; settings in the same folder are kept

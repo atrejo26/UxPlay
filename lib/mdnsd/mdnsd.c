@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #ifndef WIN32
 #include <ifaddrs.h>
@@ -31,6 +32,9 @@
 #define MDNS_MAX_PACKET 1500
 #define MDNS_COMBINED_PACKET_MAX 1200
 #define MDNS_TTL_HOST 120
+#define MDNS_MAX_LINKS4 4            /* the main network plus a few hotspots */
+#define MDNS_REFRESH_SECONDS 5       /* how often to look for a hotspot turned on later */
+#define MDNS_HOTSPOT_ADDR 0xC0A88901 /* 192.168.137.1: Windows Mobile hotspot (Internet Connection Sharing) */
 
 #define DNS_TYPE_A 1
 #define DNS_TYPE_AAAA 28
@@ -49,6 +53,13 @@ typedef struct {
     size_t length;
 } mdns_packet_t;
 
+/* An IPv4 network this PC is advertised on: its own address there and the subnet
+ * mask (both in network byte order; a mask of 0 means unknown). */
+typedef struct {
+    uint32_t addr;
+    uint32_t mask;
+} mdns_link4_t;
+
 typedef enum {
     MDNS_FAMILY_IPV4,
     MDNS_FAMILY_IPV6
@@ -59,7 +70,13 @@ struct mdnsd_s {
     mdnsd_service_t airplay;
     mdnsd_service_t raop;
 
-    uint32_t ipv4_addr;
+    /* links4[0] is the main network (on Windows, the one Windows prefers). The others
+     * are Mobile hotspots this PC runs: a phone joined to one can't reach the main
+     * address, so it is told the hotspot's own address. link4 is the one being sent on. */
+    mdns_link4_t links4[MDNS_MAX_LINKS4];
+    int nlinks4;
+    int link4;
+    time_t links4_checked;
     unsigned char ipv6_addr[16];
     unsigned int ipv6_scope_id;
     int sock_fd4;
@@ -233,6 +250,39 @@ static int mdns_add_aaaa(mdns_packet_t *packet, const char *name,
     return 0;
 }
 
+/* The address to put in A records: the one on the network being sent on */
+static uint32_t mdns_current_ipv4(const mdnsd_t *mdnsd)
+{
+    if (mdnsd->link4 < 0 || mdnsd->link4 >= mdnsd->nlinks4) {
+        return 0;
+    }
+    return mdnsd->links4[mdnsd->link4].addr;
+}
+
+/* A subnet mask, in network byte order, from a prefix length such as 24 */
+static inline uint32_t mdns_prefix_mask(unsigned int prefix_length)
+{
+    if (prefix_length == 0) {
+        return 0;
+    }
+    if (prefix_length >= 32) {
+        return 0xFFFFFFFFu;
+    }
+    return htonl(0xFFFFFFFFu << (32 - prefix_length));
+}
+
+/* Which link a query came in on, from the sender's address (network byte order):
+ * a hotspot whose subnet holds it, otherwise the main network. */
+static int mdns_link4_for(const mdns_link4_t *links, int count, uint32_t from)
+{
+    for (int i = 1; i < count; i++) {
+        if (links[i].mask && (from & links[i].mask) == (links[i].addr & links[i].mask)) {
+            return i;
+        }
+    }
+    return 0;
+}
+
 static int mdns_add_host_records(mdnsd_t *mdnsd, mdns_packet_t *packet,
                                  uint32_t ttl, unsigned int *answers,
                                  mdns_family_t family)
@@ -243,10 +293,11 @@ static int mdns_add_host_records(mdnsd_t *mdnsd, mdns_packet_t *packet,
      * and opening two TCP connections for the same service.
      */
     if (family == MDNS_FAMILY_IPV4) {
-        if (mdns_add_a(packet, mdnsd->host_name, mdnsd->ipv4_addr, ttl)) {
+        uint32_t ipv4_addr = mdns_current_ipv4(mdnsd);
+        if (mdns_add_a(packet, mdnsd->host_name, ipv4_addr, ttl)) {
             return -1;
         }
-        if (mdnsd->ipv4_addr) {
+        if (ipv4_addr) {
             (*answers)++;
         }
     } else {
@@ -368,72 +419,133 @@ static int mdns_is_virtual_adapter(const IP_ADAPTER_ADDRESSES *a)
     return 0;
 }
 
-/* The adapter's first usable IPv4 address (not a self-assigned 169.254.x.x one), or 0 */
-static uint32_t mdns_adapter_ipv4(const IP_ADAPTER_ADDRESSES *a)
+/* The adapter's first usable IPv4 address (not a self-assigned 169.254.x.x one), or 0.
+ * Its subnet mask goes in *mask. */
+static uint32_t mdns_adapter_ipv4(const IP_ADAPTER_ADDRESSES *a, uint32_t *mask)
 {
     for (const IP_ADAPTER_UNICAST_ADDRESS *u = a->FirstUnicastAddress; u; u = u->Next) {
         if (u->Address.lpSockaddr && u->Address.lpSockaddr->sa_family == AF_INET) {
             uint32_t addr = ((const struct sockaddr_in *) u->Address.lpSockaddr)->sin_addr.s_addr;
             uint32_t host = ntohl(addr);
             if (host != 0 && (host >> 16) != 0xA9FE) {   /* 169.254.0.0/16 */
+                *mask = mdns_prefix_mask(u->OnLinkPrefixLength);
                 return addr;
             }
         }
     }
+    *mask = 0;
     return 0;
 }
-#endif
 
-static uint32_t mdns_get_default_ipv4(void)
+/* The adapter Windows' Mobile hotspot shares a connection through: it has the
+ * hotspot's own address, 192.168.137.1. The iPhones joined to the hotspot are on
+ * this adapter, and nothing else on the PC can reach them. */
+static int mdns_is_hotspot_adapter(const IP_ADAPTER_ADDRESSES *a, uint32_t addr)
 {
-    uint32_t addr = 0;
-#ifdef _WIN32
+    static const wchar_t *const names[] = {
+        L"Wi-Fi Direct Virtual Adapter", L"Hosted Network Virtual Adapter", NULL
+    };
+    if (a->OperStatus != IfOperStatusUp || !addr) {
+        return 0;
+    }
+    if (ntohl(addr) == MDNS_HOTSPOT_ADDR) {
+        return 1;
+    }
+    for (int i = 0; names[i]; i++) {
+        if (a->Description && wcsstr(a->Description, names[i])) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Fills links with the networks to advertise on: first the main one, then any Mobile
+ * hotspot this PC runs. Returns how many, or -1 if Windows could not list its adapters. */
+static int mdns_get_links4(mdns_link4_t *links, int max, int quiet)
+{
     ULONG buflen = 15000;
     PIP_ADAPTER_ADDRESSES pAddresses = NULL;
     DWORD dwRetVal = ERROR_BUFFER_OVERFLOW;
+    int count = 1;
+
+    memset(links, 0, sizeof(*links) * (size_t) max);
 
     /* the adapter list can grow between calls, so retry a few times */
     for (int tries = 0; tries < 3 && dwRetVal == ERROR_BUFFER_OVERFLOW; tries++) {
         free(pAddresses);
         pAddresses = (IP_ADAPTER_ADDRESSES *) malloc(buflen);
         if (!pAddresses) {
-            return 0;
+            return -1;
         }
         dwRetVal = GetAdaptersAddresses(AF_INET, GAA_FLAG_INCLUDE_GATEWAYS | GAA_FLAG_SKIP_ANYCAST |
                                         GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER,
                                         NULL, pAddresses, &buflen);
     }
+    if (dwRetVal != NO_ERROR) {
+        free(pAddresses);
+        return -1;
+    }
 
-    if (dwRetVal == NO_ERROR) {
-        /* Of the connected Wi-Fi/Ethernet adapters with a default gateway, take the
-         * one Windows itself prefers: the lowest route metric. Only if there is none,
-         * fall back to any other connected adapter (e.g. a PC whose only network
-         * is a tunnel), rather than advertising no address at all. */
-        const IP_ADAPTER_ADDRESSES *best = NULL;
-        uint32_t best_addr = 0;
-        for (int strict = 1; strict >= 0 && !best; strict--) {
-            for (const IP_ADAPTER_ADDRESSES *pCurr = pAddresses; pCurr; pCurr = pCurr->Next) {
-                if (pCurr->OperStatus != IfOperStatusUp || pCurr->FirstGatewayAddress == NULL ||
-                    pCurr->IfType == IF_TYPE_SOFTWARE_LOOPBACK ||
-                    (strict && mdns_is_virtual_adapter(pCurr))) {
-                    continue;
-                }
-                uint32_t candidate = mdns_adapter_ipv4(pCurr);
-                if (candidate && (!best || pCurr->Ipv4Metric < best->Ipv4Metric)) {
-                    best = pCurr;
-                    best_addr = candidate;
-                }
+    /* Of the connected Wi-Fi/Ethernet adapters with a default gateway, take the
+     * one Windows itself prefers: the lowest route metric. Only if there is none,
+     * fall back to any other connected adapter (e.g. a PC whose only network
+     * is a tunnel), rather than advertising no address at all. */
+    const IP_ADAPTER_ADDRESSES *best = NULL;
+    for (int strict = 1; strict >= 0 && !best; strict--) {
+        for (const IP_ADAPTER_ADDRESSES *pCurr = pAddresses; pCurr; pCurr = pCurr->Next) {
+            uint32_t mask;
+            if (pCurr->OperStatus != IfOperStatusUp || pCurr->FirstGatewayAddress == NULL ||
+                pCurr->IfType == IF_TYPE_SOFTWARE_LOOPBACK ||
+                (strict && mdns_is_virtual_adapter(pCurr))) {
+                continue;
+            }
+            uint32_t candidate = mdns_adapter_ipv4(pCurr, &mask);
+            if (candidate && (!best || pCurr->Ipv4Metric < best->Ipv4Metric)) {
+                best = pCurr;
+                links[0].addr = candidate;
+                links[0].mask = mask;
             }
         }
-        if (best) {
-            addr = best_addr;
-            unsigned char *b = (unsigned char *) &addr;
-            fprintf(stderr, "mDNS: advertising on %u.%u.%u.%u (%ls)\n", b[0], b[1], b[2], b[3],
-                    best->FriendlyName ? best->FriendlyName : L"network adapter");
+    }
+    if (best && !quiet) {
+        unsigned char *b = (unsigned char *) &links[0].addr;
+        fprintf(stderr, "mDNS: advertising on %u.%u.%u.%u (%ls)\n", b[0], b[1], b[2], b[3],
+                best->FriendlyName ? best->FriendlyName : L"network adapter");
+    }
+
+    for (const IP_ADAPTER_ADDRESSES *pCurr = pAddresses; pCurr && count < max; pCurr = pCurr->Next) {
+        uint32_t mask;
+        uint32_t addr;
+        int seen = 0;
+        if (pCurr == best) {
+            continue;
         }
+        addr = mdns_adapter_ipv4(pCurr, &mask);
+        if (!mdns_is_hotspot_adapter(pCurr, addr)) {
+            continue;
+        }
+        for (int i = 0; i < count; i++) {
+            seen |= (links[i].addr == addr);
+        }
+        if (seen) {
+            continue;
+        }
+        links[count].addr = addr;
+        links[count].mask = mask ? mask : mdns_prefix_mask(24);
+        if (!quiet) {
+            unsigned char *b = (unsigned char *) &addr;
+            fprintf(stderr, "mDNS: also advertising on %u.%u.%u.%u (%ls), for iPhones on this PC's Mobile hotspot\n",
+                    b[0], b[1], b[2], b[3], pCurr->FriendlyName ? pCurr->FriendlyName : L"Mobile hotspot");
+        }
+        count++;
     }
     free(pAddresses);
-#else    
+    return count;
+}
+#else
+static uint32_t mdns_get_default_ipv4(void)
+{
+    uint32_t addr = 0;
     int fd;
     struct sockaddr_in remote;
     struct sockaddr_in local;
@@ -455,12 +567,18 @@ static uint32_t mdns_get_default_ipv4(void)
     }
 
     CLOSESOCKET(fd);
-#endif
-    //printf("local ipv4 address %d.%d.%d.%d\n",  (addr & 0xff), ((addr >> 8) & 0xff),
-    //       ((addr >> 16) & 0xff),((addr >> 24) & 0xff));
-    
     return addr;
 }
+
+/* Elsewhere, just the main network (as before) */
+static int mdns_get_links4(mdns_link4_t *links, int max, int quiet)
+{
+    (void) quiet;
+    memset(links, 0, sizeof(*links) * (size_t) max);
+    links[0].addr = mdns_get_default_ipv4();
+    return 1;
+}
+#endif
 
 static int mdns_get_default_ipv6(unsigned char addr[16], unsigned int *scope_id)
 {
@@ -576,6 +694,21 @@ static int mdns_open_socket4(uint32_t iface_addr)
     }
 
     return fd;
+}
+
+/* Listens for queries on one more network (a Mobile hotspot), or stops listening there */
+static void mdns_membership4(int fd, uint32_t iface_addr, int join)
+{
+    struct ip_mreq mreq;
+
+    if (fd == -1 || !iface_addr) {
+        return;
+    }
+    memset(&mreq, 0, sizeof(mreq));
+    inet_pton(AF_INET, MDNS_ADDR4, &mreq.imr_multiaddr);
+    mreq.imr_interface.s_addr = iface_addr;
+    setsockopt(fd, IPPROTO_IP, join ? IP_ADD_MEMBERSHIP : IP_DROP_MEMBERSHIP,
+               (const char *) &mreq, sizeof(mreq));
 }
 
 static int mdns_open_socket6(unsigned int scope_id)
@@ -792,6 +925,22 @@ static void mdns_send_packet6(mdnsd_t *mdnsd, const mdns_packet_t *packet,
            (struct sockaddr *) &addr, sizeof(addr));
 }
 
+/* Sends what follows on links4[i]: multicast goes out on that network and the A
+ * record holds this PC's address there */
+static void mdns_use_link4_locked(mdnsd_t *mdnsd, int i)
+{
+    if (i < 0 || i >= mdnsd->nlinks4) {
+        i = 0;
+    }
+    mdnsd->link4 = i;
+    if (mdnsd->sock_fd4 != -1 && mdnsd->links4[i].addr) {
+        struct in_addr iface;
+        iface.s_addr = mdnsd->links4[i].addr;
+        setsockopt(mdnsd->sock_fd4, IPPROTO_IP, IP_MULTICAST_IF,
+                   (const char *) &iface, sizeof(iface));
+    }
+}
+
 static void mdns_send_service_locked(mdnsd_t *mdnsd, const mdnsd_service_t *service,
                                      int include_host, uint32_t ttl,
                                      mdns_family_t family, const void *to)
@@ -849,8 +998,53 @@ static void mdns_send_response_locked(mdnsd_t *mdnsd, int include_airplay,
 
 static void mdns_announce_locked(mdnsd_t *mdnsd, uint32_t ttl)
 {
-    mdns_send_response_locked(mdnsd, 1, 1, 1, ttl, MDNS_FAMILY_IPV4, NULL);
+    for (int i = 0; i < mdnsd->nlinks4 || i == 0; i++) {
+        mdns_use_link4_locked(mdnsd, i);
+        mdns_send_response_locked(mdnsd, 1, 1, 1, ttl, MDNS_FAMILY_IPV4, NULL);
+    }
+    mdns_use_link4_locked(mdnsd, 0);
     mdns_send_response_locked(mdnsd, 1, 1, 1, ttl, MDNS_FAMILY_IPV6, NULL);
+}
+
+/* Used on Windows: after looking again for networks to advertise on, takes the new
+ * list, so a Mobile hotspot turned on after UxPlay started (or a new address on the
+ * main network) is picked up. Listens on the new networks and stops on the ones gone;
+ * the caller then announces. Returns 1 if anything changed. */
+static inline int mdns_update_links4_locked(mdnsd_t *mdnsd, const mdns_link4_t *links, int count)
+{
+    int changed = (count != mdnsd->nlinks4);
+
+    if (count < 1 || count > MDNS_MAX_LINKS4) {
+        return 0;
+    }
+    for (int i = 0; i < count && !changed; i++) {
+        changed = (links[i].addr != mdnsd->links4[i].addr || links[i].mask != mdnsd->links4[i].mask);
+    }
+    if (!changed) {
+        return 0;
+    }
+    for (int i = 0; i < mdnsd->nlinks4; i++) {
+        int kept = 0;
+        for (int j = 0; j < count; j++) {
+            kept |= (links[j].addr == mdnsd->links4[i].addr);
+        }
+        if (!kept) {
+            mdns_membership4(mdnsd->sock_fd4, mdnsd->links4[i].addr, 0);
+        }
+    }
+    for (int j = 0; j < count; j++) {
+        int had = 0;
+        for (int i = 0; i < mdnsd->nlinks4; i++) {
+            had |= (links[j].addr == mdnsd->links4[i].addr);
+        }
+        if (!had) {
+            mdns_membership4(mdnsd->sock_fd4, links[j].addr, 1);
+        }
+    }
+    memcpy(mdnsd->links4, links, sizeof(*links) * (size_t) count);
+    mdnsd->nlinks4 = count;
+    mdns_use_link4_locked(mdnsd, 0);
+    return 1;
 }
 
 static int mdns_question_matches_service(const mdnsd_t *mdnsd, const char *name,
@@ -945,6 +1139,10 @@ static void mdns_handle_query(mdnsd_t *mdnsd, const unsigned char *bytes,
     }
 
     if (include_airplay || include_raop || include_host) {
+        if (family == MDNS_FAMILY_IPV4 && from) {
+            mdns_use_link4_locked(mdnsd, mdns_link4_for(mdnsd->links4, mdnsd->nlinks4,
+                ((const struct sockaddr_in *) from)->sin_addr.s_addr));
+        }
         mdns_send_response_locked(mdnsd, include_airplay, include_raop,
                                   include_host, MDNSD_TTL_SERVICE, family,
                                   NULL);
@@ -953,6 +1151,7 @@ static void mdns_handle_query(mdnsd_t *mdnsd, const unsigned char *bytes,
                                       include_host, MDNSD_TTL_SERVICE, family,
                                       from);
         }
+        mdns_use_link4_locked(mdnsd, 0);
     }
     MUTEX_UNLOCK(mdnsd->mutex);
 }
@@ -974,6 +1173,17 @@ static THREAD_RETVAL mdns_thread(void *arg)
         fd4 = mdnsd->sock_fd4;
         fd6 = mdnsd->sock_fd6;
         running = mdnsd->running;
+#ifdef _WIN32
+        if (running && fd4 != -1 && time(NULL) - mdnsd->links4_checked >= MDNS_REFRESH_SECONDS) {
+            mdns_link4_t links[MDNS_MAX_LINKS4];
+            int count = mdns_get_links4(links, MDNS_MAX_LINKS4, 1);
+            mdnsd->links4_checked = time(NULL);
+            if (count > 0 && mdns_update_links4_locked(mdnsd, links, count)) {
+                mdns_get_links4(links, MDNS_MAX_LINKS4, 0);  /* log the new list */
+                mdns_announce_locked(mdnsd, MDNSD_TTL_SERVICE);
+            }
+        }
+#endif
         MUTEX_UNLOCK(mdnsd->mutex);
 
         if (!running || (fd4 == -1 && fd6 == -1)) {
@@ -1079,13 +1289,22 @@ int mdnsd_start(mdnsd_t *mdnsd)
     int error4 = 0;
     int error6 = 0;
 
-    mdnsd->ipv4_addr = mdns_get_default_ipv4();
+    mdnsd->nlinks4 = mdns_get_links4(mdnsd->links4, MDNS_MAX_LINKS4, 0);
+    if (mdnsd->nlinks4 < 1) {
+        memset(mdnsd->links4, 0, sizeof(mdnsd->links4));
+        mdnsd->nlinks4 = 1;
+    }
+    mdnsd->link4 = 0;
+    mdnsd->links4_checked = time(NULL);
     mdns_get_default_ipv6(mdnsd->ipv6_addr, &mdnsd->ipv6_scope_id);
 
-    mdnsd->sock_fd4 = mdns_open_socket4(mdnsd->ipv4_addr);
+    mdnsd->sock_fd4 = mdns_open_socket4(mdnsd->links4[0].addr);
     if (mdnsd->sock_fd4 < 0) {
         error4 = mdnsd->sock_fd4;
         mdnsd->sock_fd4 = -1;
+    }
+    for (int i = 1; i < mdnsd->nlinks4; i++) {
+        mdns_membership4(mdnsd->sock_fd4, mdnsd->links4[i].addr, 1);
     }
 
     mdnsd->sock_fd6 = mdns_open_socket6(mdnsd->ipv6_scope_id);
@@ -1191,7 +1410,11 @@ void mdnsd_goodbye(mdnsd_t *mdnsd, const mdnsd_service_t *service)
     }
 
     MUTEX_LOCK(mdnsd->mutex);
-    mdns_send_service_locked(mdnsd, service, 0, 0, MDNS_FAMILY_IPV4, NULL);
+    for (int i = 0; i < mdnsd->nlinks4 || i == 0; i++) {
+        mdns_use_link4_locked(mdnsd, i);
+        mdns_send_service_locked(mdnsd, service, 0, 0, MDNS_FAMILY_IPV4, NULL);
+    }
+    mdns_use_link4_locked(mdnsd, 0);
     mdns_send_service_locked(mdnsd, service, 0, 0, MDNS_FAMILY_IPV6, NULL);
     MUTEX_UNLOCK(mdnsd->mutex);
 }

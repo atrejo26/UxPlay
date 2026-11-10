@@ -53,11 +53,15 @@ public class FirewallRuleEdgeCases
             string path = sb.ToString();
             if (!FirewallRule.IsSafeProgramPath(path))
                 continue;
-            string add = FirewallRule.NetshArguments(path)[1];
-            // exactly the two quotes around the name and the two around the path
-            Assert.Equal(4, add.Split('"').Length - 1);
-            Assert.DoesNotContain("\n", add);
-            Assert.DoesNotContain("%", add);
+            foreach (string add in FirewallRule.NetshArguments(path))
+            {
+                if (!FirewallRule.MustSucceed(add))
+                    continue;
+                // exactly the two quotes around the name and the two around the path
+                Assert.Equal(4, add.Split('"').Length - 1);
+                Assert.DoesNotContain("\n", add);
+                Assert.DoesNotContain("%", add);
+            }
         }
     }
 }

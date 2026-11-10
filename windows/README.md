@@ -61,6 +61,12 @@ connected UxPlay sits idle and the PC sleeps as usual.
   networks Windows calls Private or Domain, never on Public ones such as café,
   hotel or airport Wi-Fi. If your home Wi-Fi is set to Public, UxPlay says so
   and the notice opens Windows' network settings, where you can set it to Private.
+- **Your own hotspot, and nothing else Public.** On a campus, school or work
+  network that keeps phones from finding PCs, turn on Windows' Mobile hotspot
+  and join it from the iPhone. UxPlay advertises on the hotspot as well (and
+  tells iPhones there its address, 192.168.137.1), and the installer's
+  "UxPlay (Mobile hotspot)" rules let in only devices on 192.168.137.0/24: to
+  that address, or to the mDNS port. Other Public networks stay closed.
 - **A PIN by default.** The first time each iPhone connects it must type the
   4-digit code shown on this PC, so a neighbour on the same Wi-Fi can't take
   over your screen. Paired iPhones are remembered.
@@ -75,6 +81,11 @@ connected UxPlay sits idle and the PC sleeps as usual.
 ### iPhone doesn't list the PC?
 
 - Both must be on the same Wi-Fi network, not a guest network.
+- On a campus, school or work network, phones often can't find PCs (the Wi-Fi
+  and the wired network may even be separate subnets). Turn on Windows'
+  **Mobile hotspot** (Settings → Network & internet), turn its Power saving
+  off, and join it from the iPhone. The log then also says
+  `mDNS: also advertising on 192.168.137.1`.
 - **Troubleshooting → Allow through Windows Firewall**.
 - **Troubleshooting → Show log**: the line `mDNS: advertising on …` gives the
   address the iPhone is told to use. It should be this PC's Wi-Fi or Ethernet
@@ -110,7 +121,7 @@ connected UxPlay sits idle and the PC sleeps as usual.
 | `RELEASE_NOTES.md` | Notes used for releases published from the Actions tab. |
 | `installer.iss` | Inno Setup script for `UxPlay-Setup.exe`: shortcuts, firewall rule, optional start at sign-in, uninstaller. |
 | `README.txt` | Quick-start guide shipped inside the app folder. |
-| `tests/` | Unit tests for the tray app's logic, with a coverage minimum: `dotnet test windows/tests`. |
+| `tests/` | Unit tests for the tray app's logic, with a coverage minimum: `dotnet test windows/tests`. `mdnsd_test.c` tests how iPhones find the PC (`lib/mdnsd`), hotspot included; CI builds and runs it. |
 | `tools/make_icon.py` | Draws `tray/uxplay.ico` (needs Pillow). |
 
 ### How the tray app is organised

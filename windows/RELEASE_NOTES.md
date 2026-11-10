@@ -3,8 +3,9 @@
 Mirror your iPhone or iPad screen to your Windows PC with AirPlay. No MSYS2, Bonjour or compiling needed.
 
 ### What's new
+- **Works on campus, school and work networks.** Those networks often keep phones from finding PCs (your iPhone's Wi-Fi and the PC's Ethernet can even be separate networks). Turn on Windows' **Mobile hotspot** and join it from your iPhone: UxPlay now finds the hotspot by itself, also when you turn it on after UxPlay started, and tells iPhones on it the hotspot's own address. The firewall lets in only devices on your own hotspot, and still nothing on other Public networks. See **How to connect my iPhone** in the tray menu.
 - **Safe on any network.** UxPlay can only be reached on networks Windows calls Private (or a work domain), never on public Wi-Fi in cafés, hotels or airports. If your home Wi-Fi is set to Public, UxPlay tells you and opens the setting to change it. **Ask for a PIN** is now on for new installs: each iPhone types the code shown on your PC the first time it connects, so nobody else on your Wi-Fi can take over your screen. uxplay.exe is now built with stack protection, checked memory functions, ASLR and DEP, and for any 64-bit PC, not only the CPU of the build machine.
-- **Tested before every release.** 204 unit tests cover everyday use and the hard cases: broken settings files, odd device names, devices taking turns, and thousands of random inputs. Every build measures their coverage (99% of lines, 97% of branches) and fails below 95% / 90%. A release can only be published from a build that passed them.
+- **Tested before every release.** 219 unit tests cover everyday use and the hard cases: broken settings files, odd device names, devices taking turns, and thousands of random inputs. Tests of how iPhones find the PC, including a real query and answer over the network, run on every build too. Every build measures their coverage (99% of lines, 97% of branches) and fails below 95% / 90%. A release can only be published from a build that passed them.
 - **No endless restart loops.** If uxplay.exe crashes, UxPlay still restarts it by itself, but after 3 crashes in 10 minutes it stops and tells you, with the log one click away.
 - **Fixes found by the new tests:** a device name with brackets, such as "Sam's (Work) iPhone", is shown in full; a malformed message from uxplay can no longer crash the tray app; a hand-edited quality value in settings.ini can't add uxplay options; Advanced options separated by tabs are recognised; and a crash or power cut while saving settings can no longer leave a broken settings file.
 - **Sound output choice (beta).** Settings → **Sound output**: if you see the picture but hear nothing, try *Windows audio (WASAPI)* or *Compatibility mode (DirectSound)*.
@@ -43,6 +44,7 @@ Right-click the tray icon for full screen, settings (name, quality, smoothness, 
 - Windows 10 or 11, 64-bit (Intel/AMD).
 - The installer isn't code-signed, so Windows SmartScreen may warn you. Click **More info → Run anyway**.
 - The firewall rule is for Windows Firewall. If you use another firewall or security suite (ESET, Norton and so on), allow `uxplay.exe` there for both TCP and UDP. Sound uses UDP.
+- Using the portable copy on a Mobile hotspot? Choose **Troubleshooting → Allow through Windows Firewall** once; the installer does this for you.
 - Upgrading? The firewall rule now covers Private networks only. If your iPhone no longer finds the PC, set your home Wi-Fi to Private in Windows' network settings (UxPlay's notice opens them).
 
 Based on [UxPlay](https://github.com/FDH2/UxPlay) 1.74 (GPL v3).

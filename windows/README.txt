@@ -48,6 +48,17 @@ Smoother mirroring
 iPhone doesn't show this PC?
 ----------------------------
   - Check both are on the same Wi-Fi network (not a guest network).
+  - On a campus, school or work network? Those often keep phones from
+    finding PCs, even on the same Wi-Fi. Use this PC's own hotspot instead:
+      1. Windows Settings > Network & internet > Mobile hotspot.
+      2. Share my internet connection from: Ethernet (or Wi-Fi).
+         Share over: Wi-Fi. Edit sets the name and password.
+      3. Turn Power saving off, then turn Mobile hotspot on.
+      4. On the iPhone: Settings > Wi-Fi > choose the hotspot's name.
+    UxPlay finds the hotspot by itself within a few seconds; the log says
+    "mDNS: also advertising on 192.168.137.1". Using the portable copy?
+    Choose Troubleshooting > Allow through Windows Firewall once, so the
+    iPhone can get through the firewall on the hotspot.
   - Right-click the UxPlay icon > Troubleshooting > Allow through Windows Firewall.
   - Using a VPN? Turn it off while mirroring, or allow local network access in it.
   - Right-click the UxPlay icon > Troubleshooting > Show log: the line
